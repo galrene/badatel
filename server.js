@@ -26,34 +26,70 @@ const MIME_TYPES = {
 };
 
 const server = http.createServer((req, res) => {
-  apiHandler(req, res, () => {
-    // Serve static dist or public files
-    let pathname = new URL(req.url, `http://${req.headers.host}`).pathname;
-    if (pathname === '/') pathname = '/index.html';
-
-    const checkPaths = [
-      path.join(distDir, pathname),
-      path.join(publicDir, pathname)
-    ];
-
-    for (const filePath of checkPaths) {
-      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-        const ext = path.extname(filePath).toLowerCase();
-        res.writeHead(200, { 'Content-Type': MIME_TYPES[ext] || 'application/octet-stream' });
-        return fs.createReadStream(filePath).pipe(res);
+  // Graceful catch-all wrapper to prevent server process termination
+  try {
+    apiHandler(req, res, () => {
+      // 1. Safe URL extraction & validation
+      let rawPathname;
+      try {
+        const parsedUrl = new URL(req.url, 'http://localhost');
+        rawPathname = parsedUrl.pathname;
+      } catch (urlErr) {
+        res.writeHead(400, { 'Content-Type': 'text/plain' });
+        return res.end('Bad Request: Invalid URL');
       }
-    }
 
-    // Fallback to dist/index.html for SPA routing if available
-    const indexPath = path.join(distDir, 'index.html');
-    if (fs.existsSync(indexPath)) {
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      return fs.createReadStream(indexPath).pipe(res);
-    }
+      if (rawPathname === '/') rawPathname = '/index.html';
 
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('Not Found');
-  });
+      // 2. Prevent path traversal attacks
+      const safePath = path.normalize(rawPathname).replace(/^(\.\.[\/\\])+/, '');
+
+      // Check uploads/public first for active user content, then dist
+      const checkPaths = [
+        path.join(publicDir, safePath),
+        path.join(distDir, safePath)
+      ];
+
+      for (const filePath of checkPaths) {
+        // Enforce boundary within allowed root dirs
+        if (!filePath.startsWith(publicDir) && !filePath.startsWith(distDir)) continue;
+
+        try {
+          if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+            const ext = path.extname(filePath).toLowerCase();
+            res.writeHead(200, { 'Content-Type': MIME_TYPES[ext] || 'application/octet-stream' });
+            const stream = fs.createReadStream(filePath);
+            stream.on('error', (streamErr) => {
+              console.warn('Stream read error:', streamErr.message);
+              if (!res.headersSent) res.writeHead(500);
+              res.end();
+            });
+            return stream.pipe(res);
+          }
+        } catch (fileErr) {
+          // File stat / access error, proceed to fallback
+        }
+      }
+
+      // Fallback to dist/index.html for SPA routing if available
+      const indexPath = path.join(distDir, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        const stream = fs.createReadStream(indexPath);
+        stream.on('error', () => res.end());
+        return stream.pipe(res);
+      }
+
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('Not Found');
+    });
+  } catch (err) {
+    console.error('Unhandled server error:', err);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+    }
+    res.end('Internal Server Error');
+  }
 });
 
 const HOST = process.env.HOST || '0.0.0.0';

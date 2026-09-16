@@ -239,8 +239,14 @@ function readSettings() {
   return defaultSettings;
 }
 
+function writeAtomicJson(filePath, data) {
+  const tempPath = `${filePath}.tmp.${Date.now()}.${Math.random().toString(36).slice(2)}`;
+  fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), 'utf8');
+  fs.renameSync(tempPath, filePath);
+}
+
 function writeSettings(settings) {
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf8');
+  writeAtomicJson(SETTINGS_FILE, settings);
 }
 
 function readBuildings() {
@@ -255,7 +261,7 @@ function readBuildings() {
 }
 
 function writeBuildings(buildings) {
-  fs.writeFileSync(BUILDINGS_FILE, JSON.stringify(buildings, null, 2), 'utf8');
+  writeAtomicJson(BUILDINGS_FILE, buildings);
 }
 
 // Helper to parse JSON body from Node request
@@ -293,10 +299,17 @@ export function createApiMiddleware() {
   }
 
   return async function apiMiddleware(req, res, next) {
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    const pathname = url.pathname;
+    let rawPathname;
+    try {
+      const url = new URL(req.url, 'http://localhost');
+      rawPathname = url.pathname;
+    } catch {
+      res.statusCode = 400;
+      res.setHeader('Content-Type', 'application/json');
+      return res.end(JSON.stringify({ error: 'Invalid URL' }));
+    }
 
-    if (!pathname.startsWith('/api/')) {
+    if (!rawPathname.startsWith('/api/')) {
       return next();
     }
 
@@ -304,7 +317,7 @@ export function createApiMiddleware() {
 
     try {
       // 1. GET /api/data
-      if (req.method === 'GET' && pathname === '/api/data') {
+      if (req.method === 'GET' && rawPathname === '/api/data') {
         const settings = readSettings();
         const buildings = readBuildings();
         res.statusCode = 200;
@@ -312,7 +325,7 @@ export function createApiMiddleware() {
       }
 
       // 2. POST /api/buildings
-      if (req.method === 'POST' && pathname === '/api/buildings') {
+      if (req.method === 'POST' && rawPathname === '/api/buildings') {
         const body = await parseJsonBody(req);
         if (!Array.isArray(body.buildings)) {
           res.statusCode = 400;
@@ -324,7 +337,7 @@ export function createApiMiddleware() {
       }
 
       // 3. POST /api/settings
-      if (req.method === 'POST' && pathname === '/api/settings') {
+      if (req.method === 'POST' && rawPathname === '/api/settings') {
         const body = await parseJsonBody(req);
         const current = readSettings();
         const updated = { ...current, ...body };
@@ -335,15 +348,16 @@ export function createApiMiddleware() {
 
       // 4. POST /api/upload
       // Accepts { filename: string, base64: string, target?: 'map' | 'doc' }
-      if (req.method === 'POST' && pathname === '/api/upload') {
+      if (req.method === 'POST' && rawPathname === '/api/upload') {
         const body = await parseJsonBody(req);
         const { filename, base64, target } = body;
-        if (!filename || !base64) {
+        if (!filename || !base64 || typeof filename !== 'string' || typeof base64 !== 'string') {
           res.statusCode = 400;
           return res.end(JSON.stringify({ error: 'filename and base64 required' }));
         }
 
-        const cleanName = `${Date.now()}_${path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        const safeBase = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
+        const cleanName = `${Date.now()}_${safeBase}`;
         const targetDir = target === 'map' ? path.join(rootDir, 'public', 'uploads') : UPLOADS_DIR;
         const filePath = path.join(targetDir, cleanName);
 
@@ -351,12 +365,16 @@ export function createApiMiddleware() {
         const base64Data = base64.replace(/^data:[^;]+;base64,/, '');
         fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
 
-        // If HEIC, automatically convert to JPEG
+        // If HEIC, automatically convert to JPEG and clean up original
         let finalPath = filePath;
         let finalName = cleanName;
         if (cleanName.toLowerCase().endsWith('.heic')) {
           finalPath = await convertHeicToJpg(filePath);
           finalName = path.basename(finalPath);
+          // Unlink original .heic once converted to prevent endless loops and disk clutter
+          if (finalPath !== filePath && fs.existsSync(filePath)) {
+            try { fs.unlinkSync(filePath); } catch {}
+          }
         } else {
           // Normalize EXIF orientation for regular photos
           await autoOrientImage(filePath);
@@ -386,27 +404,42 @@ export function createApiMiddleware() {
 
       // 5. POST /api/rotate
       // Accepts { url: string, degrees: number, isMap?: boolean, mapId?: string }
-      if (req.method === 'POST' && pathname === '/api/rotate') {
+      if (req.method === 'POST' && rawPathname === '/api/rotate') {
         const body = await parseJsonBody(req);
         const { url: imageUrl, degrees = 90, isMap = false, mapId } = body;
 
-        if (!imageUrl) {
+        if (!imageUrl || typeof imageUrl !== 'string') {
           res.statusCode = 400;
-          return res.end(JSON.stringify({ error: 'url is required' }));
+          return res.end(JSON.stringify({ error: 'Valid url is required' }));
         }
 
-        // Determine disk path
-        const relative = imageUrl.replace(/^\//, '').split('?')[0];
-        const filePath = path.join(rootDir, 'public', relative);
+        // Validate degrees
+        const numDegrees = Number(degrees);
+        if (!Number.isFinite(numDegrees) || ![90, 180, 270, -90, -180, -270].includes(numDegrees)) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ error: 'degrees must be one of: 90, 180, 270, -90, -180, -270' }));
+        }
+
+        // Sanitize path against directory traversal
+        const cleanUrl = imageUrl.split('?')[0].replace(/^(\.\.[\/\\])+/, '');
+        const relative = path.normalize(cleanUrl).replace(/^[\/\\]+/, '');
+        const publicBase = path.join(rootDir, 'public');
+        const filePath = path.resolve(publicBase, relative);
+
+        // Enforce boundary strictly within public/
+        if (!filePath.startsWith(publicBase + path.sep)) {
+          res.statusCode = 403;
+          return res.end(JSON.stringify({ error: 'Access denied' }));
+        }
 
         if (!fs.existsSync(filePath)) {
           res.statusCode = 404;
-          return res.end(JSON.stringify({ error: `File not found on disk: ${relative}` }));
+          return res.end(JSON.stringify({ error: 'File not found on disk' }));
         }
 
         // Rotate using sharp
         const currentBuffer = fs.readFileSync(filePath);
-        const rotatedBuffer = await sharp(currentBuffer).rotate(degrees).toBuffer();
+        const rotatedBuffer = await sharp(currentBuffer).rotate(numDegrees).toBuffer();
         fs.writeFileSync(filePath, rotatedBuffer);
 
         const meta = await sharp(filePath).metadata();
@@ -442,23 +475,30 @@ export function createApiMiddleware() {
       }
 
       // 6. GET /api/local-files
-      if (req.method === 'GET' && pathname === '/api/local-files') {
+      if (req.method === 'GET' && rawPathname === '/api/local-files') {
         const rawFiles = fs.readdirSync(UPLOADS_DIR).filter(f => !f.startsWith('.'));
         
         for (const f of rawFiles) {
           if (f.toLowerCase().endsWith('.heic')) {
             const sourcePath = path.join(UPLOADS_DIR, f);
-            await convertHeicToJpg(sourcePath);
+            const converted = await convertHeicToJpg(sourcePath);
+            // Remove source HEIC to avoid repeated conversion loops
+            if (converted !== sourcePath && fs.existsSync(sourcePath)) {
+              try { fs.unlinkSync(sourcePath); } catch {}
+            }
           }
         }
 
         const files = fs.readdirSync(UPLOADS_DIR)
           .filter(f => !f.startsWith('.') && !f.toLowerCase().endsWith('.heic'))
-          .map(f => ({
-            name: f,
-            url: `/uploads/${f}`,
-            size: fs.statSync(path.join(UPLOADS_DIR, f)).size
-          }));
+          .map(f => {
+            const full = path.join(UPLOADS_DIR, f);
+            return {
+              name: f,
+              url: `/uploads/${f}`,
+              size: fs.existsSync(full) ? fs.statSync(full).size : 0
+            };
+          });
         res.statusCode = 200;
         return res.end(JSON.stringify({ files }));
       }

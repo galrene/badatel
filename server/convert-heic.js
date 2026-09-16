@@ -14,6 +14,33 @@ if (!fs.existsSync(targetDir)) {
   process.exit(1);
 }
 
+import sharp from 'sharp';
+import heicConvert from 'heic-convert';
+
+async function convertFile(fullPath, jpgPath) {
+  // Try sips on macOS
+  if (fs.existsSync('/usr/bin/sips')) {
+    try {
+      await execFileAsync('/usr/bin/sips', ['-s', 'format', 'jpeg', fullPath, '--out', jpgPath]);
+      const autoOrientedBuffer = await sharp(jpgPath).rotate().toBuffer();
+      fs.writeFileSync(jpgPath, autoOrientedBuffer);
+      return true;
+    } catch {}
+  }
+
+  // Cross-platform fallback
+  try {
+    const inputBuffer = fs.readFileSync(fullPath);
+    const converted = await heicConvert({ buffer: inputBuffer, format: 'JPEG', quality: 0.92 });
+    const autoOrientedBuffer = await sharp(converted).rotate().toBuffer();
+    fs.writeFileSync(jpgPath, autoOrientedBuffer);
+    return true;
+  } catch (err) {
+    console.error(`✗ Failed to convert ${path.basename(fullPath)}:`, err.message);
+    return false;
+  }
+}
+
 async function convertFolder(dir) {
   const files = fs.readdirSync(dir);
   let convertedCount = 0;
@@ -23,17 +50,15 @@ async function convertFolder(dir) {
     const stat = fs.statSync(fullPath);
 
     if (stat.isDirectory()) {
-      await convertFolder(fullPath);
+      convertedCount += await convertFolder(fullPath);
     } else if (file.toLowerCase().endsWith('.heic')) {
       const jpgPath = fullPath.replace(/\.heic$/i, '.jpg');
       if (!fs.existsSync(jpgPath)) {
         console.log(`Converting: ${file} -> ${path.basename(jpgPath)}...`);
-        try {
-          await execFileAsync('/usr/bin/sips', ['-s', 'format', 'jpeg', fullPath, '--out', jpgPath]);
+        const ok = await convertFile(fullPath, jpgPath);
+        if (ok) {
           convertedCount++;
           console.log(`✓ Converted: ${path.basename(jpgPath)}`);
-        } catch (err) {
-          console.error(`✗ Failed to convert ${file}:`, err.message);
         }
       } else {
         console.log(`Already converted: ${path.basename(jpgPath)}`);
