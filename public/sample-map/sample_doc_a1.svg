@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1200" width="1600" height="1200">
+  <!-- Blueprint style background -->
+  <rect width="1600" height="1200" fill="#0f172a"/>
+  <!-- Blueprint grid -->
+  <defs>
+    <pattern id="bp-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="1"/>
+    </pattern>
+    <pattern id="bp-grid-sub" width="200" height="200" patternUnits="userSpaceOnUse">
+      <path d="M 200 0 L 0 0 0 200" fill="none" stroke="#334155" stroke-width="1.5"/>
+    </pattern>
+  </defs>
+  <rect width="1600" height="1200" fill="url(#bp-grid)"/>
+  <rect width="1600" height="1200" fill="url(#bp-grid-sub)"/>
+
+  <!-- Border -->
+  <rect x="40" y="40" width="1520" height="1120" fill="none" stroke="#38bdf8" stroke-width="2"/>
+  <rect x="50" y="50" width="1500" height="1100" fill="none" stroke="#0284c7" stroke-width="1"/>
+
+  <!-- Title Block bottom right -->
+  <g transform="translate(1000, 950)">
+    <rect width="520" height="180" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+    <text x="20" y="35" font-family="'JetBrains Mono', monospace" font-size="18" font-weight="700" fill="#38bdf8">RESIDENTIAL BUILDING ALPHA (BLDG 101)</text>
+    <text x="20" y="65" font-family="'Inter', sans-serif" font-size="14" fill="#94a3b8">Ground Floor Architecture & Apartment Division</text>
+    <text x="20" y="95" font-family="'Inter', sans-serif" font-size="12" fill="#cbd5e1">Scale: 1:100  •  Drawing Ref: AR-101-01  •  Rev: C (Approved)</text>
+    <text x="20" y="125" font-family="'Inter', sans-serif" font-size="12" fill="#cbd5e1">Author: Ing. Arch. P. Horak  •  Date: 12.04.1978</text>
+    <!-- Stamp -->
+    <rect x="360" y="45" width="130" height="85" fill="none" stroke="#ef4444" stroke-width="2" transform="rotate(-5 360 45)"/>
+    <text x="375" y="75" font-family="'Inter', sans-serif" font-size="12" font-weight="700" fill="#ef4444" transform="rotate(-5 360 45)">ARCHIVE COPY</text>
+    <text x="382" y="95" font-family="'Inter', sans-serif" font-size="10" fill="#ef4444" transform="rotate(-5 360 45)">STATE HOUSING</text>
+    <text x="385" y="115" font-family="'Inter', sans-serif" font-size="10" fill="#ef4444" transform="rotate(-5 360 45)">REG. NO. 4481</text>
+  </g>
+
+  <!-- Floor Plan Layout -->
+  <!-- Exterior Walls -->
+  <rect x="150" y="150" width="1300" height="720" fill="#0369a1" fill-opacity="0.1" stroke="#38bdf8" stroke-width="6"/>
+
+  <!-- Corridor -->
+  <rect x="150" y="460" width="1300" height="100" fill="#0284c7" fill-opacity="0.2" stroke="#38bdf8" stroke-width="2" stroke-dasharray="10,5"/>
+  <text x="700" y="520" font-family="'JetBrains Mono', monospace" font-size="16" fill="#7dd3fc" letter-spacing="4">MAIN CORRIDOR & ACCESS HALL</text>
+
+  <!-- Central Staircase -->
+  <rect x="680" y="150" width="240" height="310" fill="#1e293b" stroke="#38bdf8" stroke-width="3"/>
+  <line x1="680" y1="200" x2="920" y2="200" stroke="#7dd3fc" stroke-width="1.5"/>
+  <line x1="680" y1="230" x2="920" y2="230" stroke="#7dd3fc" stroke-width="1.5"/>
+  <line x1="680" y1="260" x2="920" y2="260" stroke="#7dd3fc" stroke-width="1.5"/>
+  <line x1="680" y1="290" x2="920" y2="290" stroke="#7dd3fc" stroke-width="1.5"/>
+  <line x1="680" y1="320" x2="920" y2="320" stroke="#7dd3fc" stroke-width="1.5"/>
+  <line x1="680" y1="350" x2="920" y2="350" stroke="#7dd3fc" stroke-width="1.5"/>
+  <line x1="680" y1="380" x2="920" y2="380" stroke="#7dd3fc" stroke-width="1.5"/>
+  <line x1="680" y1="410" x2="920" y2="410" stroke="#7dd3fc" stroke-width="1.5"/>
+  <text x="730" y="185" font-family="'Inter', sans-serif" font-size="14" font-weight="700" fill="#38bdf8">STAIRWELL (UP/DN)</text>
+
+  <!-- Apartment 1 (Top Left) -->
+  <rect x="150" y="150" width="530" height="310" fill="none" stroke="#38bdf8" stroke-width="2"/>
+  <text x="180" y="210" font-family="'JetBrains Mono', monospace" font-size="20" font-weight="700" fill="#bae6fd">APT. 01 (3+1) • 74.2 m²</text>
+  <text x="180" y="240" font-family="'Inter', sans-serif" font-size="13" fill="#7dd3fc">Living Room: 21.4 m² | Bed 1: 14.2 m²</text>
+  <text x="180" y="265" font-family="'Inter', sans-serif" font-size="13" fill="#7dd3fc">Kitchen: 9.8 m² | Bath: 5.1 m² | Balcony: 4.5 m²</text>
+
+  <!-- Apartment 2 (Top Right) -->
+  <rect x="920" y="150" width="530" height="310" fill="none" stroke="#38bdf8" stroke-width="2"/>
+  <text x="950" y="210" font-family="'JetBrains Mono', monospace" font-size="20" font-weight="700" fill="#bae6fd">APT. 02 (3+1) • 74.2 m²</text>
+  <text x="950" y="240" font-family="'Inter', sans-serif" font-size="13" fill="#7dd3fc">Living Room: 21.4 m² | Bed 1: 14.2 m²</text>
+  <text x="950" y="265" font-family="'Inter', sans-serif" font-size="13" fill="#7dd3fc">Kitchen: 9.8 m² | Bath: 5.1 m² | Balcony: 4.5 m²</text>
+
+  <!-- Apartment 3 (Bottom Left) -->
+  <rect x="150" y="560" width="430" height="310" fill="none" stroke="#38bdf8" stroke-width="2"/>
+  <text x="180" y="620" font-family="'JetBrains Mono', monospace" font-size="20" font-weight="700" fill="#bae6fd">APT. 03 (2+1) • 56.8 m²</text>
+  <text x="180" y="650" font-family="'Inter', sans-serif" font-size="13" fill="#7dd3fc">Living: 18.2 m² | Bed: 12.6 m²</text>
+  <text x="180" y="675" font-family="'Inter', sans-serif" font-size="13" fill="#7dd3fc">Kitchen: 8.5 m² | Loggia: 3.8 m²</text>
+
+  <!-- Apartment 4 (Bottom Center) -->
+  <rect x="580" y="560" width="440" height="310" fill="none" stroke="#38bdf8" stroke-width="2"/>
+  <text x="610" y="620" font-family="'JetBrains Mono', monospace" font-size="20" font-weight="700" fill="#bae6fd">APT. 04 (1+1) • 42.0 m²</text>
+  <text x="610" y="650" font-family="'Inter', sans-serif" font-size="13" fill="#7dd3fc">Living/Bed: 22.0 m² | Kitchen: 7.2 m²</text>
+  <text x="610" y="675" font-family="'Inter', sans-serif" font-size="13" fill="#7dd3fc">Bath: 4.2 m² | Hallway: 8.6 m²</text>
+
+  <!-- Apartment 5 (Bottom Right) -->
+  <rect x="1020" y="560" width="430" height="310" fill="none" stroke="#38bdf8" stroke-width="2"/>
+  <text x="1050" y="620" font-family="'JetBrains Mono', monospace" font-size="20" font-weight="700" fill="#bae6fd">APT. 05 (2+1) • 56.8 m²</text>
+  <text x="1050" y="650" font-family="'Inter', sans-serif" font-size="13" fill="#7dd3fc">Living: 18.2 m² | Bed: 12.6 m²</text>
+  <text x="1050" y="675" font-family="'Inter', sans-serif" font-size="13" fill="#7dd3fc">Kitchen: 8.5 m² | Loggia: 3.8 m²</text>
+
+  <!-- Dimension lines -->
+  <g stroke="#38bdf8" stroke-width="1.5">
+    <line x1="150" y1="110" x2="1450" y2="110"/>
+    <line x1="150" y1="100" x2="150" y2="120"/>
+    <line x1="1450" y1="100" x2="1450" y2="120"/>
+    <text x="750" y="100" font-family="'JetBrains Mono', monospace" font-size="16" fill="#38bdf8" text-anchor="middle">TOTAL LENGTH: 48,600 mm (48.6 m)</text>
+
+    <line x1="90" y1="150" x2="90" y2="870"/>
+    <line x1="80" y1="150" x2="100" y2="150"/>
+    <line x1="80" y1="870" x2="100" y2="870"/>
+    <text x="75" y="520" font-family="'JetBrains Mono', monospace" font-size="16" fill="#38bdf8" text-anchor="middle" transform="rotate(-90 75 520)">DEPTH: 18,400 mm</text>
+  </g>
+</svg>

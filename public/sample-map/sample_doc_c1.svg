@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 900" width="1400" height="900">
+  <rect width="1400" height="900" fill="#fefce8"/>
+  <rect x="30" y="30" width="1340" height="840" fill="none" stroke="#ca8a04" stroke-width="2"/>
+  <text x="60" y="80" font-family="'Inter', sans-serif" font-size="24" font-weight="700" fill="#854d0e">BUILDING C - CIVIC & COMMERCIAL PAVILION ZONING</text>
+  <text x="60" y="110" font-family="'JetBrains Mono', monospace" font-size="14" fill="#a16207">PERMIT NO: ZN-2018-912 • USE DESIGNATION: MIXED COMMERCIAL/CIVIC</text>
+
+  <!-- Zones layout -->
+  <g transform="translate(80, 160)">
+    <rect x="0" y="0" width="350" height="500" fill="#fde68a" stroke="#d97706" stroke-width="2" rx="4"/>
+    <text x="25" y="45" font-family="'Inter', sans-serif" font-size="18" font-weight="700" fill="#78350f">ZONE 1: GROCERY</text>
+    <text x="25" y="75" font-family="'Inter', sans-serif" font-size="13" fill="#92400e">Retail Area: 280 m²</text>
+    <text x="25" y="100" font-family="'Inter', sans-serif" font-size="13" fill="#92400e">Loading dock access on West</text>
+
+    <rect x="380" y="0" width="380" height="500" fill="#fef08a" stroke="#d97706" stroke-width="2" rx="4"/>
+    <text x="405" y="45" font-family="'Inter', sans-serif" font-size="18" font-weight="700" fill="#78350f">ZONE 2: PHARMACY & POST</text>
+    <text x="405" y="75" font-family="'Inter', sans-serif" font-size="13" fill="#92400e">Pharmacy: 140 m²</text>
+    <text x="405" y="100" font-family="'Inter', sans-serif" font-size="13" fill="#92400e">Post Office: 160 m²</text>
+
+    <rect x="790" y="0" width="450" height="500" fill="#fef9c3" stroke="#d97706" stroke-width="2" rx="4"/>
+    <text x="815" y="45" font-family="'Inter', sans-serif" font-size="18" font-weight="700" fill="#78350f">ZONE 3: COMMUNITY ROOMS</text>
+    <text x="815" y="75" font-family="'Inter', sans-serif" font-size="13" fill="#92400e">Multi-purpose meeting hall: 210 m²</text>
+    <text x="815" y="100" font-family="'Inter', sans-serif" font-size="13" fill="#92400e">Admin office: 45 m²</text>
+  </g>
+</svg>

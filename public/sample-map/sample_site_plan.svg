@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2400 1600" width="2400" height="1600">
+  <defs>
+    <pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse">
+      <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,4"/>
+    </pattern>
+    <pattern id="diagonal-hatch" patternUnits="userSpaceOnUse" width="16" height="16">
+      <path d="M-4,4 l8,-8 M0,16 l16,-16 M12,20 l8,-8" stroke="#cbd5e1" stroke-width="2" />
+    </pattern>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="4" dy="6" stdDeviation="6" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Paper / Map background -->
+  <rect width="2400" height="1600" fill="#f8fafc"/>
+  <rect width="2400" height="1600" fill="url(#grid)"/>
+
+  <!-- Border Frame (Drafting style) -->
+  <rect x="40" y="40" width="2320" height="1520" fill="none" stroke="#334155" stroke-width="3"/>
+  <rect x="50" y="50" width="2300" height="1500" fill="none" stroke="#94a3b8" stroke-width="1"/>
+
+  <!-- Top Banner / Title Block in map -->
+  <g transform="translate(80, 80)">
+    <rect width="700" height="110" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" rx="4" filter="url(#shadow)"/>
+    <text x="25" y="42" font-family="'Inter', sans-serif" font-size="28" font-weight="700" fill="#0f172a">JANOV RESIDENTIAL ZONE - URBAN PLAN</text>
+    <text x="25" y="72" font-family="'Inter', sans-serif" font-size="16" fill="#64748b">Cadastral Sector 4B • Detailed Master Plan & Building Documentation Index</text>
+    <text x="25" y="94" font-family="'JetBrains Mono', monospace" font-size="13" fill="#94a3b8">SCALE 1:500 • SURVEY DATE: 1978 / 2024 UPDATE • CRS: EPSG-JANOV-LOCAL</text>
+  </g>
+
+  <!-- Compass Rose -->
+  <g transform="translate(2220, 160)">
+    <circle cx="0" cy="0" r="55" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
+    <polygon points="0,-48 10,-10 0,0" fill="#dc2626"/>
+    <polygon points="0,-48 -10,-10 0,0" fill="#b91c1c"/>
+    <polygon points="0,48 10,10 0,0" fill="#64748b"/>
+    <polygon points="0,48 -10,10 0,0" fill="#475569"/>
+    <polygon points="48,0 10,10 0,0" fill="#94a3b8"/>
+    <polygon points="-48,0 -10,-10 0,0" fill="#94a3b8"/>
+    <text x="-7" y="-55" font-family="'Inter', sans-serif" font-size="18" font-weight="800" fill="#dc2626">N</text>
+  </g>
+
+  <!-- Green park areas -->
+  <path d="M 200,300 C 400,280 600,320 800,300 C 1100,280 1400,340 1600,300 L 1600,450 C 1300,420 700,440 200,450 Z" fill="#dcfce7" stroke="#86efac" stroke-width="2"/>
+  <text x="750" y="380" font-family="'Inter', sans-serif" font-size="18" font-weight="600" fill="#16a34a" letter-spacing="4">NORTH PUBLIC PARK & GREEN CORRIDOR</text>
+
+  <path d="M 1300,800 C 1600,780 1900,820 2200,800 L 2200,1350 C 1900,1320 1600,1360 1300,1340 Z" fill="#ecfdf5" stroke="#a7f3d0" stroke-width="2"/>
+  <text x="1600" y="1100" font-family="'Inter', sans-serif" font-size="20" font-weight="600" fill="#059669" letter-spacing="3">COMMUNITY RECREATION GROUNDS</text>
+
+  <!-- Roads and avenues -->
+  <!-- Main Ring Road -->
+  <path d="M 100,480 L 2300,480" stroke="#94a3b8" stroke-width="48" fill="none" stroke-linecap="round"/>
+  <path d="M 100,480 L 2300,480" stroke="#f1f5f9" stroke-width="42" fill="none" stroke-linecap="round"/>
+  <path d="M 100,480 L 2300,480" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="20,20" fill="none"/>
+  <text x="250" y="474" font-family="'Inter', sans-serif" font-size="15" font-weight="700" fill="#64748b" letter-spacing="2">SEVERNI TRIDA (NORTH BOULEVARD)</text>
+
+  <!-- Central Crossing Avenue -->
+  <path d="M 900,480 L 900,1500" stroke="#94a3b8" stroke-width="36" fill="none"/>
+  <path d="M 900,480 L 900,1500" stroke="#f1f5f9" stroke-width="30" fill="none"/>
+  <path d="M 900,480 L 900,1500" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="16,16" fill="none"/>
+
+  <!-- South Avenue -->
+  <path d="M 100,1350 L 2300,1350" stroke="#94a3b8" stroke-width="36" fill="none"/>
+  <path d="M 100,1350 L 2300,1350" stroke="#f1f5f9" stroke-width="30" fill="none"/>
+  <path d="M 100,1350 L 2300,1350" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="16,16" fill="none"/>
+  <text x="250" y="1344" font-family="'Inter', sans-serif" font-size="15" font-weight="700" fill="#64748b" letter-spacing="2">JIH CESTA (SOUTH AVENUE)</text>
+
+  <!-- Parking lots -->
+  <rect x="250" y="580" width="180" height="260" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2" rx="4"/>
+  <text x="280" y="720" font-family="'Inter', sans-serif" font-size="18" font-weight="700" fill="#94a3b8">PARKING P1</text>
+
+  <rect x="250" y="950" width="180" height="260" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2" rx="4"/>
+  <text x="280" y="1090" font-family="'Inter', sans-serif" font-size="18" font-weight="700" fill="#94a3b8">PARKING P2</text>
+
+  <!-- BUILDING FOOTPRINTS (drawn on the base map) -->
+  <!-- Building A Footprint -->
+  <g id="building-footprint-A">
+    <rect x="520" y="580" width="320" height="180" fill="#e0e7ff" stroke="#4338ca" stroke-width="3" filter="url(#shadow)" rx="3"/>
+    <line x1="520" y1="670" x2="840" y2="670" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6,4"/>
+    <line x1="680" y1="580" x2="680" y2="760" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6,4"/>
+    <text x="535" y="605" font-family="'JetBrains Mono', monospace" font-size="14" font-weight="700" fill="#3730a3">BLDG No. 101/A</text>
+    <text x="535" y="745" font-family="'Inter', sans-serif" font-size="13" fill="#4338ca">4 FLOORS • 32 APTS</text>
+  </g>
+
+  <!-- Building B Footprint -->
+  <g id="building-footprint-B">
+    <rect x="1020" y="580" width="400" height="180" fill="#d1fae5" stroke="#065f46" stroke-width="3" filter="url(#shadow)" rx="3"/>
+    <line x1="1020" y1="670" x2="1420" y2="670" stroke="#10b981" stroke-width="1.5" stroke-dasharray="6,4"/>
+    <line x1="1153" y1="580" x2="1153" y2="760" stroke="#10b981" stroke-width="1.5" stroke-dasharray="6,4"/>
+    <line x1="1286" y1="580" x2="1286" y2="760" stroke="#10b981" stroke-width="1.5" stroke-dasharray="6,4"/>
+    <text x="1035" y="605" font-family="'JetBrains Mono', monospace" font-size="14" font-weight="700" fill="#065f46">BLDG No. 102/B</text>
+    <text x="1035" y="745" font-family="'Inter', sans-serif" font-size="13" fill="#047857">6 ENTRANCES • 48 APTS</text>
+  </g>
+
+  <!-- Building C Footprint (Commercial / Community) -->
+  <g id="building-footprint-C">
+    <rect x="720" y="950" width="480" height="200" fill="#fef3c7" stroke="#b45309" stroke-width="3" filter="url(#shadow)" rx="3"/>
+    <text x="740" y="985" font-family="'JetBrains Mono', monospace" font-size="15" font-weight="700" fill="#92400e">BLDG No. 201/C - CIVIC PAVILION</text>
+    <text x="740" y="1130" font-family="'Inter', sans-serif" font-size="14" fill="#b45309">RETAIL • POST OFFICE • PHARMACY</text>
+  </g>
+
+  <!-- Building D Footprint (Kindergarten) -->
+  <g id="building-footprint-D">
+    <rect x="1450" y="1020" width="400" height="200" fill="#fce7f3" stroke="#9d174d" stroke-width="3" filter="url(#shadow)" rx="3"/>
+    <text x="1470" y="1055" font-family="'JetBrains Mono', monospace" font-size="15" font-weight="700" fill="#831843">BLDG No. 301/D - KINDERGARTEN</text>
+    <text x="1470" y="1200" font-family="'Inter', sans-serif" font-size="14" fill="#9d174d">PRE-SCHOOL • SECURE OUTDOOR GARDEN</text>
+  </g>
+
+  <!-- Trees & Landscaping Markers -->
+  <g fill="#22c55e" stroke="#15803d" stroke-width="2">
+    <circle cx="480" cy="620" r="14" opacity="0.8"/>
+    <circle cx="480" cy="680" r="16" opacity="0.8"/>
+    <circle cx="480" cy="740" r="14" opacity="0.8"/>
+    <circle cx="960" cy="620" r="15" opacity="0.8"/>
+    <circle cx="960" cy="720" r="17" opacity="0.8"/>
+    <circle cx="1470" cy="620" r="15" opacity="0.8"/>
+    <circle cx="1470" cy="720" r="17" opacity="0.8"/>
+    <circle cx="650" cy="1050" r="16" opacity="0.8"/>
+    <circle cx="1380" cy="1080" r="18" opacity="0.8"/>
+    <circle cx="1400" cy="1160" r="15" opacity="0.8"/>
+  </g>
+
+  <!-- Scale Bar at bottom right -->
+  <g transform="translate(1950, 1480)">
+    <rect x="0" y="0" width="300" height="40" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+    <rect x="0" y="0" width="75" height="20" fill="#0f172a"/>
+    <rect x="75" y="0" width="75" height="20" fill="#ffffff"/>
+    <rect x="150" y="0" width="75" height="20" fill="#0f172a"/>
+    <rect x="225" y="0" width="75" height="20" fill="#ffffff"/>
+    <text x="0" y="34" font-family="'JetBrains Mono', monospace" font-size="12" fill="#334155">0m</text>
+    <text x="70" y="34" font-family="'JetBrains Mono', monospace" font-size="12" fill="#334155">25m</text>
+    <text x="145" y="34" font-family="'JetBrains Mono', monospace" font-size="12" fill="#334155">50m</text>
+    <text x="220" y="34" font-family="'JetBrains Mono', monospace" font-size="12" fill="#334155">75m</text>
+    <text x="285" y="34" font-family="'JetBrains Mono', monospace" font-size="12" fill="#334155">100m</text>
+  </g>
+</svg>

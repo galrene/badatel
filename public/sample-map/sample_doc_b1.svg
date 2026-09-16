@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000">
+  <rect width="1600" height="1000" fill="#ffffff"/>
+  <rect x="30" y="30" width="1540" height="940" fill="none" stroke="#475569" stroke-width="2"/>
+  
+  <text x="70" y="80" font-family="'Inter', sans-serif" font-size="24" font-weight="700" fill="#0f172a">BUILDING B - SOUTHERN ELEVATION & THERMAL FACADE RETROFIT</text>
+  <text x="70" y="110" font-family="'JetBrains Mono', monospace" font-size="14" fill="#64748b">DRAWING NO. FA-B-04 • ARCHITECTURAL REFURBISHMENT STUDY</text>
+
+  <!-- Elevation drawing -->
+  <!-- Ground line -->
+  <line x1="100" y1="750" x2="1500" y2="750" stroke="#334155" stroke-width="4"/>
+  <text x="120" y="780" font-family="'Inter', sans-serif" font-size="14" font-weight="600" fill="#64748b">GROUND LEVEL ±0.000 (312.4 m A.S.L.)</text>
+
+  <!-- Facade main body -->
+  <rect x="150" y="250" width="1300" height="500" fill="#f8fafc" stroke="#10b981" stroke-width="3"/>
+
+  <!-- Entrances (6 entrances) -->
+  <g fill="#047857">
+    <rect x="220" y="650" width="70" height="100"/>
+    <rect x="440" y="650" width="70" height="100"/>
+    <rect x="660" y="650" width="70" height="100"/>
+    <rect x="880" y="650" width="70" height="100"/>
+    <rect x="1100" y="650" width="70" height="100"/>
+    <rect x="1320" y="650" width="70" height="100"/>
+  </g>
+
+  <!-- Windows rows -->
+  <g fill="#bae6fd" stroke="#0284c7" stroke-width="1.5">
+    <!-- Floor 4 -->
+    <rect x="200" y="300" width="110" height="60"/>
+    <rect x="420" y="300" width="110" height="60"/>
+    <rect x="640" y="300" width="110" height="60"/>
+    <rect x="860" y="300" width="110" height="60"/>
+    <rect x="1080" y="300" width="110" height="60"/>
+    <rect x="1300" y="300" width="110" height="60"/>
+    <!-- Floor 3 -->
+    <rect x="200" y="400" width="110" height="60"/>
+    <rect x="420" y="400" width="110" height="60"/>
+    <rect x="640" y="400" width="110" height="60"/>
+    <rect x="860" y="400" width="110" height="60"/>
+    <rect x="1080" y="400" width="110" height="60"/>
+    <rect x="1300" y="400" width="110" height="60"/>
+    <!-- Floor 2 -->
+    <rect x="200" y="500" width="110" height="60"/>
+    <rect x="420" y="500" width="110" height="60"/>
+    <rect x="640" y="500" width="110" height="60"/>
+    <rect x="860" y="500" width="110" height="60"/>
+    <rect x="1080" y="500" width="110" height="60"/>
+    <rect x="1300" y="500" width="110" height="60"/>
+  </g>
+
+  <!-- Roof line & parapet -->
+  <rect x="140" y="235" width="1320" height="15" fill="#334155"/>
+  <text x="800" y="220" font-family="'Inter', sans-serif" font-size="14" fill="#475569" text-anchor="middle">ROOF PARAPET LEVEL +14.200 m</text>
+</svg>

@@ -1,0 +1,17 @@
+services:
+  badatel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: badatel
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      - PORT=5173
+      - HOST=0.0.0.0
+    volumes:
+      # Persist buildings and settings data across container restarts
+      - ./data:/app/data
+      # Persist uploaded site plans and document photos
+      - ./public/uploads:/app/public/uploads

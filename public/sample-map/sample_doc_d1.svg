@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 900" width="1400" height="900">
+  <rect width="1400" height="900" fill="#fff1f2"/>
+  <rect x="30" y="30" width="1340" height="840" fill="none" stroke="#e11d48" stroke-width="2"/>
+  <text x="60" y="80" font-family="'Inter', sans-serif" font-size="24" font-weight="700" fill="#9f1239">BUILDING D - MUNICIPAL KINDERGARTEN & PLAYGROUND</text>
+  <text x="60" y="110" font-family="'JetBrains Mono', monospace" font-size="14" fill="#be123c">FACILITY CAPACITY: 80 CHILDREN • 3 CLASSROOMS</text>
+
+  <!-- Ground plan layout -->
+  <g transform="translate(80, 160)">
+    <rect x="0" y="0" width="550" height="480" fill="#fce7f3" stroke="#db2777" stroke-width="2" rx="4"/>
+    <text x="25" y="45" font-family="'Inter', sans-serif" font-size="18" font-weight="700" fill="#831843">PAVILION MAIN FLOOR</text>
+    <text x="25" y="80" font-family="'Inter', sans-serif" font-size="13" fill="#9d174d">Classroom A (Toddlers): 65 m²</text>
+    <text x="25" y="105" font-family="'Inter', sans-serif" font-size="13" fill="#9d174d">Classroom B (Middle): 70 m²</text>
+    <text x="25" y="130" font-family="'Inter', sans-serif" font-size="13" fill="#9d174d">Classroom C (Pre-school): 75 m²</text>
+    <text x="25" y="155" font-family="'Inter', sans-serif" font-size="13" fill="#9d174d">Dining room & kitchen: 110 m²</text>
+
+    <rect x="600" y="0" width="620" height="480" fill="#dcfce7" stroke="#16a34a" stroke-width="2" stroke-dasharray="8,4" rx="8"/>
+    <text x="625" y="45" font-family="'Inter', sans-serif" font-size="18" font-weight="700" fill="#14532d">OUTDOOR PLAYGROUND & NATURE AREA (1,450 m²)</text>
+    <circle cx="750" cy="180" r="45" fill="#fef08a" stroke="#ca8a04" stroke-width="2"/>
+    <text x="720" y="185" font-family="'Inter', sans-serif" font-size="12" font-weight="700" fill="#854d0e">SANDPIT</text>
+    <rect x="860" y="140" width="120" height="80" fill="#e0e7ff" stroke="#4338ca" rx="4"/>
+    <text x="880" y="185" font-family="'Inter', sans-serif" font-size="12" font-weight="700" fill="#3730a3">SWINGS</text>
+  </g>
+</svg>
