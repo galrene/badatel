@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import sharp from 'sharp';
+import heicConvert from 'heic-convert';
 
 const execFileAsync = promisify(execFile);
 
@@ -31,7 +32,7 @@ async function convertHeicToJpg(filePath) {
   if (!filePath.toLowerCase().endsWith('.heic')) return filePath;
   const jpgPath = filePath.replace(/\.heic$/i, '.jpg');
 
-  // Attempt macOS native sips first if available
+  // 1. Attempt macOS native sips first if available (fastest on macOS)
   try {
     if (fs.existsSync('/usr/bin/sips')) {
       await execFileAsync('/usr/bin/sips', ['-s', 'format', 'jpeg', filePath, '--out', jpgPath]);
@@ -41,10 +42,27 @@ async function convertHeicToJpg(filePath) {
       return jpgPath;
     }
   } catch (err) {
-    console.warn('sips conversion failed, falling back to sharp:', err.message);
+    console.warn('sips conversion failed, trying heic-convert:', err.message);
   }
 
-  // Fallback to Sharp directly (works on Linux / Docker with libvips/libheif)
+  // 2. Use heic-convert (pure JS/WASM decoder, fully reliable across Linux/Docker)
+  try {
+    const inputBuffer = fs.readFileSync(filePath);
+    const convertedBuffer = await heicConvert({
+      buffer: inputBuffer,
+      format: 'JPEG',
+      quality: 0.92
+    });
+    // Auto-orient with sharp
+    const autoOrientedBuffer = await sharp(convertedBuffer).rotate().toBuffer();
+    fs.writeFileSync(jpgPath, autoOrientedBuffer);
+    console.log(`Converted HEIC to JPEG with heic-convert: ${path.basename(jpgPath)}`);
+    return jpgPath;
+  } catch (err) {
+    console.warn('heic-convert failed, trying sharp directly:', err.message);
+  }
+
+  // 3. Fallback to Sharp directly
   try {
     const autoOrientedBuffer = await sharp(filePath).rotate().jpeg({ quality: 90 }).toBuffer();
     fs.writeFileSync(jpgPath, autoOrientedBuffer);

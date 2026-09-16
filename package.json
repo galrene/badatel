@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@geoman-io/leaflet-geoman-free": "^2.19.0",
+    "heic-convert": "^2.1.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.16.0",
     "react": "^18.3.1",
