@@ -38,6 +38,15 @@ export const MapViewer: React.FC<MapViewerProps> = ({
   const polygonsLayerRef = useRef<L.FeatureGroup | null>(null);
   const badgesLayerRef = useRef<L.LayerGroup | null>(null);
 
+  const currentMapRef = useRef(currentMap);
+  currentMapRef.current = currentMap;
+  const buildingsRef = useRef(buildings);
+  buildingsRef.current = buildings;
+  const onAddBuildingRef = useRef(onAddBuilding);
+  onAddBuildingRef.current = onAddBuilding;
+  const mapsRef = useRef(maps);
+  mapsRef.current = maps;
+
   const [editTool, setEditTool] = useState<EditTool>('drag');
   const [isDrawing, setIsDrawing] = useState(false);
   const [hoveredBuilding, setHoveredBuilding] = useState<Building | null>(null);
@@ -93,34 +102,54 @@ export const MapViewer: React.FC<MapViewerProps> = ({
         snapDistance: 15,
       });
 
-      // Handle polygon creation event
+      // Handle shape creation event
       map.on('pm:create', (e: any) => {
+        let points: [number, number][] = [];
+        const layer = e.layer;
+
         if (e.shape === 'Polygon' || e.shape === 'Rectangle') {
-          const layer = e.layer;
           const latLngs = layer.getLatLngs()[0] as L.LatLng[];
-          const points: [number, number][] = latLngs.map(ll => [Math.round(ll.lat), Math.round(ll.lng)]);
-          const centroid = computeCentroid(points);
-
-          map.removeLayer(layer);
-          setIsDrawing(false);
-
-          const existingLetters = buildings.map(b => b.letter);
-          const nextLetter = getNextLetter(existingLetters);
-
-          const newBuilding: Building = {
-            id: `bldg-${Date.now()}`,
-            mapId: currentMap.id,
-            letter: nextLetter,
-            name: `Building ${nextLetter}`,
-            description: 'Newly marked building footprint.',
-            color: '#3b82f6',
-            polygon: points,
-            badgePosition: centroid,
-            documents: []
-          };
-
-          onAddBuilding(newBuilding);
+          if (latLngs && latLngs.length > 0) {
+            points = latLngs.map(ll => [Math.round(ll.lat), Math.round(ll.lng)]);
+          }
+        } else if (e.shape === 'Circle' || e.shape === 'CircleMarker') {
+          const center = layer.getLatLng();
+          const radius = (typeof layer.getRadius === 'function' ? layer.getRadius() : 40) || 40;
+          for (let i = 0; i < 24; i++) {
+            const angle = (i / 24) * 2 * Math.PI;
+            points.push([
+              Math.round(center.lat + radius * Math.sin(angle)),
+              Math.round(center.lng + radius * Math.cos(angle)),
+            ]);
+          }
         }
+
+        if (points.length < 3) return;
+
+        const centroid = computeCentroid(points);
+
+        map.removeLayer(layer);
+        setIsDrawing(false);
+
+        const curMap = currentMapRef.current;
+        const curBuildings = buildingsRef.current;
+
+        const existingLetters = curBuildings.map(b => b.letter);
+        const nextLetter = getNextLetter(existingLetters);
+
+        const newBuilding: Building = {
+          id: `bldg-${Date.now()}`,
+          mapId: curMap.id,
+          letter: nextLetter,
+          name: `Building ${nextLetter}`,
+          description: 'Newly marked building footprint.',
+          color: '#3b82f6',
+          polygon: points,
+          badgePosition: centroid,
+          documents: []
+        };
+
+        onAddBuildingRef.current(newBuilding);
       });
     }
 
@@ -134,6 +163,11 @@ export const MapViewer: React.FC<MapViewerProps> = ({
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
+
+    if (isDrawing && (map as any).pm) {
+      (map as any).pm.disableDraw();
+      setIsDrawing(false);
+    }
 
     const bounds: L.LatLngBoundsExpression = [
       [0, 0],
@@ -159,7 +193,10 @@ export const MapViewer: React.FC<MapViewerProps> = ({
     polyGroup.clearLayers();
     badgeGroup.clearLayers();
 
-    const currentBuildings = buildings.filter(b => (b.mapId || currentMap.id) === currentMap.id);
+    const currentBuildings = buildings.filter(b => {
+      const mapId = b.mapId || (maps.length > 0 ? maps[0].id : currentMap.id);
+      return mapId === currentMap.id;
+    });
 
     currentBuildings.forEach(building => {
       if (!building.polygon || building.polygon.length < 3) return;
