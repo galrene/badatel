@@ -27,3 +27,6 @@ dist-ssr
 data/
 public/uploads/*
 !public/uploads/.gitkeep
+
+# Electron builds
+release/

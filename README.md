@@ -21,18 +21,31 @@ Access the application at `http://localhost:5173` (or your server's IP/domain).
 
 Data and uploads persist on the host under `./data/` and `./public/uploads/`.
 
-## Local Development
+## Desktop Application (macOS / Windows / Linux)
+
+Badatel can run as a standalone cross-platform desktop application powered by Electron.
+
+### Desktop Development
 
 ```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Start production server
-npm start
+# Run desktop app in development mode with live hot-reloading
+npm run electron:dev
 ```
+
+### Packaging Desktop Installers
+
+```bash
+# Test local binary without full packaging
+npm run electron:pack
+
+# Package distribution installers for current OS
+npm run electron:dist
+
+# Target specific operating systems:
+npm run electron:dist:mac    # macOS (.dmg, .zip)
+npm run electron:dist:win    # Windows (.exe installer, portable)
+npm run electron:dist:linux  # Linux (.AppImage, .deb)
+```
+
+Packaged installers and binaries are generated in the `./release/` directory. User annotations, uploaded blueprints, and settings are stored persistently in the OS application data directory (`~/Library/Application Support/Badatel` on macOS, `%APPDATA%/Badatel` on Windows, `~/.config/Badatel` on Linux), and can be opened directly from the desktop menu (`CmdOrCtrl+Shift+D`).
+

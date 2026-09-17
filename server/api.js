@@ -12,11 +12,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
-const DATA_DIR = path.join(rootDir, 'data');
+const DATA_DIR = process.env.DATA_DIR || path.join(rootDir, 'data');
 const BUILDINGS_FILE = path.join(DATA_DIR, 'buildings.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
-const UPLOADS_DIR = path.join(rootDir, 'public', 'uploads');
-const SAMPLE_DIR = path.join(rootDir, 'public', 'sample-map');
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(rootDir, 'public', 'uploads');
+const SAMPLE_DIR = process.env.SAMPLE_DIR || path.join(rootDir, 'public', 'sample-map');
 
 // Ensure directories exist
 for (const dir of [DATA_DIR, UPLOADS_DIR, SAMPLE_DIR]) {
@@ -358,7 +358,7 @@ export function createApiMiddleware() {
 
         const safeBase = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
         const cleanName = `${Date.now()}_${safeBase}`;
-        const targetDir = target === 'map' ? path.join(rootDir, 'public', 'uploads') : UPLOADS_DIR;
+        const targetDir = UPLOADS_DIR;
         const filePath = path.join(targetDir, cleanName);
 
         // Strip data:image/...;base64, prefix if present
@@ -423,13 +423,29 @@ export function createApiMiddleware() {
         // Sanitize path against directory traversal
         const cleanUrl = imageUrl.split('?')[0].replace(/^(\.\.[\/\\])+/, '');
         const relative = path.normalize(cleanUrl).replace(/^[\/\\]+/, '');
-        const publicBase = path.join(rootDir, 'public');
-        const filePath = path.resolve(publicBase, relative);
 
-        // Enforce boundary strictly within public/
-        if (!filePath.startsWith(publicBase + path.sep)) {
-          res.statusCode = 403;
-          return res.end(JSON.stringify({ error: 'Access denied' }));
+        let filePath;
+        if (cleanUrl.startsWith('/uploads/')) {
+          const rel = cleanUrl.replace(/^\/uploads\/?/, '');
+          filePath = path.resolve(UPLOADS_DIR, rel);
+          if (!filePath.startsWith(UPLOADS_DIR + path.sep)) {
+            res.statusCode = 403;
+            return res.end(JSON.stringify({ error: 'Access denied' }));
+          }
+        } else if (cleanUrl.startsWith('/sample-map/')) {
+          const rel = cleanUrl.replace(/^\/sample-map\/?/, '');
+          filePath = path.resolve(SAMPLE_DIR, rel);
+          if (!filePath.startsWith(SAMPLE_DIR + path.sep)) {
+            res.statusCode = 403;
+            return res.end(JSON.stringify({ error: 'Access denied' }));
+          }
+        } else {
+          const publicBase = process.env.PUBLIC_DIR || path.join(rootDir, 'public');
+          filePath = path.resolve(publicBase, relative);
+          if (!filePath.startsWith(publicBase + path.sep)) {
+            res.statusCode = 403;
+            return res.end(JSON.stringify({ error: 'Access denied' }));
+          }
         }
 
         if (!fs.existsSync(filePath)) {
