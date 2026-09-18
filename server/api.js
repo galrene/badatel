@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import sharp from 'sharp';
 import heicConvert from 'heic-convert';
+import { getVersionInfo } from './version-helper.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -565,6 +566,14 @@ export function createApiMiddleware() {
         const { files, folders } = await scanUploadsDirectory(UPLOADS_DIR);
         res.statusCode = 200;
         return res.end(JSON.stringify({ files, folders }));
+      }
+
+      // 7. GET /api/version
+      if (req.method === 'GET' && rawPathname === '/api/version') {
+        const info = getVersionInfo();
+        res.setHeader('Content-Type', 'application/json');
+        res.statusCode = 200;
+        return res.end(JSON.stringify(info));
       }
 
       res.statusCode = 404;

@@ -47,3 +47,23 @@ export interface MapSettings {
 
 export type AppMode = 'view' | 'edit';
 export type EditTool = 'drag' | 'reshape' | 'draw';
+
+export interface AppVersionInfo {
+  version: string;
+  commitHash: string;
+  shortHash: string;
+  commitMessage: string;
+  commitDate: string;
+  branch?: string;
+  buildTime?: string;
+}
+
+// Vite compile-time injected constants
+declare global {
+  const __APP_VERSION__: string;
+  const __COMMIT_HASH__: string;
+  const __COMMIT_SHORT_HASH__: string;
+  const __COMMIT_MESSAGE__: string;
+  const __COMMIT_DATE__: string;
+  const __BUILD_TIME__: string;
+}
