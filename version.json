@@ -1,9 +1,9 @@
 {
   "version": "0.1.0",
-  "commitHash": "1d9e8c976183f51860e8febf0c2907bf3130be93",
-  "shortHash": "1d9e8c9",
-  "commitMessage": "chore: update version.json after streaming fix",
-  "commitDate": "2026-09-18 21:00:50 +0200",
-  "branch": "building_photo_selection_confirmation",
-  "buildTime": "2026-09-18T19:29:44.419Z"
+  "commitHash": "0949944c1e0f8030224a1670f23d0328f98bd9bb",
+  "shortHash": "0949944",
+  "commitMessage": "Merge branch 'global_upload_status_menu'",
+  "commitDate": "2026-09-18 21:48:15 +0200",
+  "branch": "main",
+  "buildTime": "2026-09-18T19:48:17.872Z"
 }

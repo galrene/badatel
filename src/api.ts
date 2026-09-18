@@ -57,6 +57,98 @@ export async function uploadImageFile(
   return res.json();
 }
 
+export interface UploadProgressInfo {
+  loaded: number;
+  total: number;
+  percent: number;
+}
+
+export interface UploadFileOptions {
+  target?: 'map' | 'doc';
+  subfolder?: string;
+  onProgress?: (info: UploadProgressInfo) => void;
+  onProcessing?: () => void;
+  signal?: AbortSignal;
+}
+
+export function uploadFileWithProgress(
+  file: File,
+  options: UploadFileOptions = {}
+): Promise<{ url: string; filename: string; originalName?: string; width?: number; height?: number; subfolder?: string }> {
+  return new Promise(async (resolve, reject) => {
+    try {
+      if (options.signal?.aborted) {
+        return reject(new DOMException('Aborted', 'AbortError'));
+      }
+
+      const base64 = await fileToBase64(file);
+      if (options.signal?.aborted) {
+        return reject(new DOMException('Aborted', 'AbortError'));
+      }
+
+      const xhr = new XMLHttpRequest();
+
+      if (options.signal) {
+        options.signal.addEventListener('abort', () => {
+          xhr.abort();
+          reject(new DOMException('Aborted', 'AbortError'));
+        });
+      }
+
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable && e.total > 0) {
+          const percent = Math.min(99, Math.round((e.loaded / e.total) * 100));
+          options.onProgress?.({
+            loaded: e.loaded,
+            total: e.total,
+            percent
+          });
+          if (e.loaded >= e.total) {
+            options.onProcessing?.();
+          }
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            resolve(data);
+          } catch (err) {
+            reject(new Error('Invalid JSON response from server'));
+          }
+        } else {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            reject(new Error(data.error || `Upload failed with status ${xhr.status}`));
+          } catch {
+            reject(new Error(`Upload failed with status ${xhr.status}`));
+          }
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        reject(new Error('Network error during upload'));
+      });
+
+      xhr.addEventListener('abort', () => {
+        reject(new DOMException('Aborted', 'AbortError'));
+      });
+
+      xhr.open('POST', '/api/upload');
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.send(JSON.stringify({
+        filename: file.name,
+        base64,
+        target: options.target || 'doc',
+        subfolder: options.subfolder
+      }));
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
 export async function rotateImage(url: string, degrees: number = 90, isMap: boolean = false, mapId?: string): Promise<{ url: string; width: number; height: number; settings?: MapSettings }> {
   const res = await fetch('/api/rotate', {
     method: 'POST',

@@ -44,12 +44,17 @@ export const MapViewer: React.FC<MapViewerProps> = ({
   buildingsRef.current = buildings;
   const onAddBuildingRef = useRef(onAddBuilding);
   onAddBuildingRef.current = onAddBuilding;
+  const onSelectBuildingRef = useRef(onSelectBuilding);
+  onSelectBuildingRef.current = onSelectBuilding;
+  const onEditBuildingRef = useRef(onEditBuilding);
+  onEditBuildingRef.current = onEditBuilding;
+  const onUpdateBuildingGeometryRef = useRef(onUpdateBuildingGeometry);
+  onUpdateBuildingGeometryRef.current = onUpdateBuildingGeometry;
   const mapsRef = useRef(maps);
   mapsRef.current = maps;
 
   const [editTool, setEditTool] = useState<EditTool>('drag');
   const [isDrawing, setIsDrawing] = useState(false);
-  const [hoveredBuilding, setHoveredBuilding] = useState<Building | null>(null);
   const [showGuide, setShowGuide] = useState(true);
 
   // Auto-fade guide message after 4 seconds whenever mode or edit tool changes
@@ -202,48 +207,43 @@ export const MapViewer: React.FC<MapViewerProps> = ({
       if (!building.polygon || building.polygon.length < 3) return;
 
       const latLngs = building.polygon.map(p => L.latLng(p[0], p[1]));
-      const isHovered = hoveredBuilding?.id === building.id;
 
       // 1. Polygon Footprint Layer
       const polygonLayer = L.polygon(latLngs, {
         color: building.color || '#3b82f6',
-        weight: isHovered ? 4 : (mode === 'edit' ? 3 : 2.5),
+        weight: mode === 'edit' ? 3 : 2.5,
         fillColor: building.color || '#3b82f6',
-        fillOpacity: isHovered ? 0.6 : 0.35,
+        fillOpacity: 0.35,
         dashArray: mode === 'edit' ? '6, 6' : undefined,
       });
 
-      polygonLayer.bindTooltip(`
-        <div class="px-2.5 py-1.5 bg-slate-900 text-slate-100 rounded-lg">
-          <div class="font-bold text-sm flex items-center gap-1.5">
-            <span class="inline-block w-3 h-3 rounded-full" style="background-color: ${building.color}"></span>
-            <span>Building [${building.letter}]</span>
+      const getTooltipContent = () => {
+        const latest = buildingsRef.current.find(b => b.id === building.id) || building;
+        return `
+          <div class="px-2.5 py-1.5 bg-slate-900 text-slate-100 rounded-lg">
+            <div class="font-bold text-sm flex items-center gap-1.5">
+              <span class="inline-block w-3 h-3 rounded-full" style="background-color: ${latest.color}"></span>
+              <span>Building [${latest.letter}]</span>
+            </div>
+            <div class="text-xs text-slate-200 mt-0.5">${latest.name}</div>
+            <div class="text-[11px] text-blue-300 font-mono mt-0.5">${latest.documents.length} document photos</div>
+            ${mode === 'edit' ? '<div class="text-[10px] text-amber-400 font-semibold mt-1">💡 Click to edit building</div>' : ''}
           </div>
-          <div class="text-xs text-slate-200 mt-0.5">${building.name}</div>
-          <div class="text-[11px] text-blue-300 font-mono mt-0.5">${building.documents.length} document photos</div>
-          ${mode === 'edit' ? '<div class="text-[10px] text-amber-400 font-semibold mt-1">💡 Click letter badge or double-click to edit info</div>' : ''}
-        </div>
-      `, {
+        `;
+      };
+
+      polygonLayer.bindTooltip(getTooltipContent, {
         direction: 'top',
         className: 'leaflet-custom-tooltip',
         opacity: 0.95
       });
-
-      polygonLayer.on('mouseover', () => setHoveredBuilding(building));
-      polygonLayer.on('mouseout', () => setHoveredBuilding(null));
-
-      if (mode === 'view') {
-        polygonLayer.on('click', () => onSelectBuilding(building));
-      } else {
-        polygonLayer.on('dblclick', () => onEditBuilding(building));
-      }
 
       // 2. Letter Badge Marker
       const center = building.badgePosition || computeCentroid(building.polygon);
       const badgeIcon = L.divIcon({
         className: 'custom-letter-badge-wrapper',
         html: `
-          <div class="custom-letter-badge ${isHovered ? 'scale-110 shadow-2xl ring-2 ring-white' : ''}" style="
+          <div class="custom-letter-badge" style="
             background: ${building.color || '#3b82f6'};
             border: 2px solid #ffffff;
             color: #ffffff;
@@ -270,26 +270,58 @@ export const MapViewer: React.FC<MapViewerProps> = ({
       const badgeMarker = L.marker([center[0], center[1]], {
         icon: badgeIcon,
         draggable: mode === 'edit',
-        zIndexOffset: isHovered ? 1000 : 500
+        zIndexOffset: 500
       });
 
-      badgeMarker.on('click', () => {
-        if (mode === 'edit') {
-          onEditBuilding(building);
-        } else {
-          onSelectBuilding(building);
+      // Hover styling without destroying DOM or triggering React re-renders
+      const applyHover = () => {
+        polygonLayer.setStyle({
+          weight: 4,
+          fillOpacity: 0.6,
+        });
+        badgeMarker.setZIndexOffset(1000);
+        const el = badgeMarker.getElement()?.querySelector('.custom-letter-badge');
+        if (el) {
+          el.classList.add('scale-110', 'shadow-2xl', 'ring-2', 'ring-white');
         }
-      });
+      };
 
-      badgeMarker.on('mouseover', () => setHoveredBuilding(building));
-      badgeMarker.on('mouseout', () => setHoveredBuilding(null));
+      const removeHover = () => {
+        polygonLayer.setStyle({
+          weight: mode === 'edit' ? 3 : 2.5,
+          fillOpacity: 0.35,
+        });
+        badgeMarker.setZIndexOffset(500);
+        const el = badgeMarker.getElement()?.querySelector('.custom-letter-badge');
+        if (el) {
+          el.classList.remove('scale-110', 'shadow-2xl', 'ring-2', 'ring-white');
+        }
+      };
+
+      polygonLayer.on('mouseover', applyHover);
+      polygonLayer.on('mouseout', removeHover);
+      badgeMarker.on('mouseover', applyHover);
+      badgeMarker.on('mouseout', removeHover);
+
+      const triggerBuildingClick = () => {
+        const latest = buildingsRef.current.find(b => b.id === building.id) || building;
+        if (mode === 'edit') {
+          onEditBuildingRef.current(latest);
+        } else {
+          onSelectBuildingRef.current(latest);
+        }
+      };
+
+      polygonLayer.on('click', triggerBuildingClick);
+      badgeMarker.on('click', triggerBuildingClick);
 
       if (mode === 'edit') {
         badgeMarker.on('dragend', (e: any) => {
           const newPos = e.target.getLatLng();
-          onUpdateBuildingGeometry(
+          const latest = buildingsRef.current.find(b => b.id === building.id) || building;
+          onUpdateBuildingGeometryRef.current(
             building.id,
-            building.polygon,
+            latest.polygon,
             [Math.round(newPos.lat), Math.round(newPos.lng)]
           );
         });
@@ -330,6 +362,8 @@ export const MapViewer: React.FC<MapViewerProps> = ({
 
           let isDraggingRegion = false;
           let dragStartLatLng: L.LatLng | null = null;
+          let startPoint: L.Point | null = null;
+          let hasMoved = false;
           let initialPolygon = [...building.polygon];
           let initialBadge: [number, number] = [center[0], center[1]];
 
@@ -338,6 +372,8 @@ export const MapViewer: React.FC<MapViewerProps> = ({
             L.DomEvent.stopPropagation(e);
             isDraggingRegion = true;
             dragStartLatLng = e.latlng;
+            startPoint = e.layerPoint;
+            hasMoved = false;
             initialPolygon = (polygonLayer.getLatLngs()[0] as L.LatLng[]).map(p => [p.lat, p.lng]);
             const markerPos = badgeMarker.getLatLng();
             initialBadge = [markerPos.lat, markerPos.lng];
@@ -345,7 +381,10 @@ export const MapViewer: React.FC<MapViewerProps> = ({
             map.dragging.disable();
 
             const onMouseMove = (moveEvent: L.LeafletMouseEvent) => {
-              if (!isDraggingRegion || !dragStartLatLng) return;
+              if (!isDraggingRegion || !dragStartLatLng || !startPoint) return;
+              if (startPoint.distanceTo(moveEvent.layerPoint) > 4) {
+                hasMoved = true;
+              }
               const dLat = moveEvent.latlng.lat - dragStartLatLng.lat;
               const dLng = moveEvent.latlng.lng - dragStartLatLng.lng;
 
@@ -362,6 +401,11 @@ export const MapViewer: React.FC<MapViewerProps> = ({
 
               map.off('mousemove', onMouseMove);
               map.off('mouseup', onMouseUp);
+
+              if (!hasMoved) {
+                triggerBuildingClick();
+                return;
+              }
 
               const finalLatLngs = (polygonLayer.getLatLngs()[0] as L.LatLng[]).map(
                 ll => [Math.round(ll.lat), Math.round(ll.lng)] as [number, number]
@@ -384,7 +428,14 @@ export const MapViewer: React.FC<MapViewerProps> = ({
         }
       }
     });
-  }, [buildings, currentMap.id, mode, editTool, hoveredBuilding?.id, onSelectBuilding, onEditBuilding, onUpdateBuildingGeometry]);
+  }, [
+    // Create a fingerprint that only changes when footprints/letter/colors/mode/editTool change,
+    // NOT when documents change or upload progress updates.
+    buildings.map(b => `${b.id}:${b.letter}:${b.color}:${b.mapId}:${JSON.stringify(b.polygon)}:${JSON.stringify(b.badgePosition)}`).join('|'),
+    currentMap.id,
+    mode,
+    editTool
+  ]);
 
   // Toggle Draw Mode
   const toggleDrawMode = useCallback(() => {
