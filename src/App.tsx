@@ -6,6 +6,7 @@ import { MapViewer } from './components/MapViewer';
 import { DocLightboxModal } from './components/DocLightboxModal';
 import { BuildingEditModal } from './components/BuildingEditModal';
 import { MapSettingsModal } from './components/MapSettingsModal';
+import { ImportExportModal } from './components/ImportExportModal';
 import { HelpModal } from './components/HelpModal';
 import { Loader2 } from 'lucide-react';
 
@@ -20,6 +21,7 @@ export const App: React.FC = () => {
   const [viewingBuilding, setViewingBuilding] = useState<Building | null>(null);
   const [editingBuilding, setEditingBuilding] = useState<Building | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   // Load initial data
@@ -105,6 +107,14 @@ export const App: React.FC = () => {
     }
   }, []);
 
+  // Handler for successful archive import
+  const handleImportSuccess = useCallback((newSettings: MapSettings, newBuildings: Building[]) => {
+    setSettings(newSettings);
+    setBuildings(newBuildings);
+    setViewingBuilding(null);
+    setEditingBuilding(null);
+  }, []);
+
   // Rotate active map page 90 degrees
   const handleRotateMap = useCallback(async () => {
     if (!settings || !currentMap) return;
@@ -169,6 +179,7 @@ export const App: React.FC = () => {
         }}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenHelp={() => setIsHelpOpen(true)}
+        onOpenImportExport={() => setIsImportExportOpen(true)}
       />
 
       {/* Main Map Canvas Area */}
@@ -227,6 +238,15 @@ export const App: React.FC = () => {
       <HelpModal
         isOpen={isHelpOpen}
         onClose={() => setIsHelpOpen(false)}
+      />
+
+      {/* Backup, Import & Export Modal */}
+      <ImportExportModal
+        isOpen={isImportExportOpen}
+        onClose={() => setIsImportExportOpen(false)}
+        settings={settings}
+        buildings={buildings}
+        onImportSuccess={handleImportSuccess}
       />
     </div>
   );

@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import sharp from 'sharp';
 import heicConvert from 'heic-convert';
+import AdmZip from 'adm-zip';
 
 const execFileAsync = promisify(execFile);
 
@@ -13,13 +14,14 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
 const DATA_DIR = path.join(rootDir, 'data');
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 const BUILDINGS_FILE = path.join(DATA_DIR, 'buildings.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const UPLOADS_DIR = path.join(rootDir, 'public', 'uploads');
 const SAMPLE_DIR = path.join(rootDir, 'public', 'sample-map');
 
 // Ensure directories exist
-for (const dir of [DATA_DIR, UPLOADS_DIR, SAMPLE_DIR]) {
+for (const dir of [DATA_DIR, BACKUP_DIR, UPLOADS_DIR, SAMPLE_DIR]) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -264,6 +266,28 @@ function writeBuildings(buildings) {
   writeAtomicJson(BUILDINGS_FILE, buildings);
 }
 
+function resolveDiskPath(urlPath) {
+  if (!urlPath || typeof urlPath !== 'string') return null;
+  const cleanUrl = urlPath.split('?')[0];
+  const normalized = path.normalize(cleanUrl).replace(/^(\.\.[\/\\])+/, '');
+  const relative = normalized.replace(/^[\/\\]+/, '');
+  const publicBase = path.resolve(rootDir, 'public');
+  const candidate = path.resolve(publicBase, relative);
+  if (candidate.startsWith(publicBase) && fs.existsSync(candidate)) {
+    return candidate;
+  }
+  return null;
+}
+
+function normalizeImportUrl(url) {
+  if (!url || typeof url !== 'string') return url;
+  if (url.startsWith('media/')) {
+    const filename = path.basename(url).replace(/[^a-zA-Z0-9._-]/g, '_');
+    return `/uploads/${filename}`;
+  }
+  return url;
+}
+
 // Helper to parse JSON body from Node request
 function parseJsonBody(req) {
   return new Promise((resolve, reject) => {
@@ -501,6 +525,292 @@ export function createApiMiddleware() {
           });
         res.statusCode = 200;
         return res.end(JSON.stringify({ files }));
+      }
+
+      // 7. GET /api/export
+      if (req.method === 'GET' && rawPathname === '/api/export') {
+        const settings = readSettings();
+        const buildings = readBuildings();
+
+        const fileMap = new Map(); // diskPath -> archiveMediaName
+        let fileCounter = 1;
+
+        function getArchiveFilename(diskPath) {
+          if (fileMap.has(diskPath)) return fileMap.get(diskPath);
+          const base = path.basename(diskPath).replace(/[^a-zA-Z0-9._-]/g, '_');
+          let archiveName = base;
+          const existingNames = new Set(fileMap.values());
+          while (existingNames.has(archiveName)) {
+            const ext = path.extname(base);
+            const stem = path.basename(base, ext);
+            archiveName = `${stem}_${fileCounter++}${ext}`;
+          }
+          fileMap.set(diskPath, archiveName);
+          return archiveName;
+        }
+
+        // Deep clone settings and buildings to adjust URLs to archive-relative paths
+        const clonedSettings = JSON.parse(JSON.stringify(settings));
+        if (Array.isArray(clonedSettings.maps)) {
+          for (const m of clonedSettings.maps) {
+            const diskPath = resolveDiskPath(m.imageUrl);
+            if (diskPath) {
+              const archiveName = getArchiveFilename(diskPath);
+              m.imageUrl = `media/${archiveName}`;
+            }
+          }
+        }
+
+        const clonedBuildings = JSON.parse(JSON.stringify(buildings));
+        if (Array.isArray(clonedBuildings)) {
+          for (const b of clonedBuildings) {
+            if (Array.isArray(b.documents)) {
+              for (const doc of b.documents) {
+                const diskPath = resolveDiskPath(doc.url);
+                if (diskPath) {
+                  const archiveName = getArchiveFilename(diskPath);
+                  doc.url = `media/${archiveName}`;
+                }
+              }
+            }
+          }
+        }
+
+        const manifest = {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          settings: clonedSettings,
+          buildings: clonedBuildings
+        };
+
+        const zip = new AdmZip();
+        zip.addFile('manifest.json', Buffer.from(JSON.stringify(manifest, null, 2), 'utf8'));
+
+        for (const [diskPath, archiveName] of fileMap.entries()) {
+          try {
+            zip.addLocalFile(diskPath, 'media', archiveName);
+          } catch (zipAddErr) {
+            console.warn(`Could not add local file ${diskPath} to archive:`, zipAddErr.message);
+          }
+        }
+
+        const zipBuffer = zip.toBuffer();
+        const dateStr = new Date().toISOString().slice(0, 10);
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="badatel-backup-${dateStr}.zip"`);
+        res.setHeader('Content-Length', zipBuffer.length);
+        res.statusCode = 200;
+        return res.end(zipBuffer);
+      }
+
+      // 8. POST /api/import/inspect
+      if (req.method === 'POST' && rawPathname === '/api/import/inspect') {
+        const body = await parseJsonBody(req);
+        const { base64 } = body;
+        if (!base64 || typeof base64 !== 'string') {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ error: 'base64 zip payload required' }));
+        }
+
+        const base64Data = base64.replace(/^data:[^;]+;base64,/, '');
+        const zipBuffer = Buffer.from(base64Data, 'base64');
+        let zip;
+        try {
+          zip = new AdmZip(zipBuffer);
+        } catch (zipErr) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ error: 'Invalid ZIP archive file' }));
+        }
+
+        const manifestEntry = zip.getEntry('manifest.json');
+        if (!manifestEntry) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ error: 'Invalid archive: missing manifest.json' }));
+        }
+
+        let manifest;
+        try {
+          manifest = JSON.parse(zip.readAsText(manifestEntry));
+        } catch (err) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ error: 'Failed to parse manifest.json: corrupted data' }));
+        }
+
+        if (!manifest.settings || !Array.isArray(manifest.buildings)) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ error: 'Archive manifest is missing settings or buildings' }));
+        }
+
+        const mediaEntries = zip.getEntries().filter(e => !e.isDirectory && e.entryName.startsWith('media/'));
+        let totalDocs = 0;
+        for (const b of manifest.buildings) {
+          if (Array.isArray(b.documents)) {
+            totalDocs += b.documents.length;
+          }
+        }
+
+        const preview = {
+          title: manifest.settings?.title || 'Badatel Project',
+          exportedAt: manifest.exportedAt || null,
+          mapCount: Array.isArray(manifest.settings?.maps) ? manifest.settings.maps.length : 0,
+          buildingCount: manifest.buildings.length,
+          documentCount: totalDocs,
+          mediaFileCount: mediaEntries.length,
+          archiveSizeBytes: zipBuffer.length
+        };
+
+        res.statusCode = 200;
+        return res.end(JSON.stringify({ success: true, preview }));
+      }
+
+      // 9. POST /api/import/execute
+      if (req.method === 'POST' && rawPathname === '/api/import/execute') {
+        const body = await parseJsonBody(req);
+        const { base64, mode = 'replace' } = body;
+        if (!base64 || typeof base64 !== 'string') {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ error: 'base64 zip payload required' }));
+        }
+
+        const base64Data = base64.replace(/^data:[^;]+;base64,/, '');
+        const zipBuffer = Buffer.from(base64Data, 'base64');
+        let zip;
+        try {
+          zip = new AdmZip(zipBuffer);
+        } catch (zipErr) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ error: 'Invalid ZIP archive file' }));
+        }
+
+        const manifestEntry = zip.getEntry('manifest.json');
+        if (!manifestEntry) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ error: 'Invalid archive: missing manifest.json' }));
+        }
+
+        let manifest;
+        try {
+          manifest = JSON.parse(zip.readAsText(manifestEntry));
+        } catch (err) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ error: 'Failed to parse manifest.json: corrupted data' }));
+        }
+
+        if (!manifest.settings || !Array.isArray(manifest.buildings)) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ error: 'Archive manifest is missing settings or buildings' }));
+        }
+
+        // If replacing all data, take a safety backup first
+        if (mode === 'replace') {
+          try {
+            const backupFile = path.join(BACKUP_DIR, `pre_replace_backup_${Date.now()}.json`);
+            const snapshot = {
+              timestamp: new Date().toISOString(),
+              settings: readSettings(),
+              buildings: readBuildings()
+            };
+            fs.writeFileSync(backupFile, JSON.stringify(snapshot, null, 2), 'utf8');
+            console.log(`Created pre-import safety backup at ${backupFile}`);
+          } catch (backupErr) {
+            console.warn('Failed to write safety backup:', backupErr.message);
+          }
+        }
+
+        // Unpack media files safely to UPLOADS_DIR
+        const entries = zip.getEntries();
+        for (const entry of entries) {
+          if (!entry.isDirectory && entry.entryName.startsWith('media/')) {
+            const safeName = path.basename(entry.entryName).replace(/[^a-zA-Z0-9._-]/g, '_');
+            const targetPath = path.join(UPLOADS_DIR, safeName);
+            fs.writeFileSync(targetPath, entry.getData());
+          }
+        }
+
+        let finalSettings;
+        let finalBuildings;
+
+        if (mode === 'replace') {
+          // Normalize URLs in imported settings
+          const importedSettings = manifest.settings;
+          if (Array.isArray(importedSettings.maps)) {
+            for (const m of importedSettings.maps) {
+              m.imageUrl = normalizeImportUrl(m.imageUrl);
+            }
+          }
+
+          // Normalize URLs in imported buildings
+          const importedBuildings = manifest.buildings.map(b => ({
+            ...b,
+            documents: (b.documents || []).map(d => ({
+              ...d,
+              url: normalizeImportUrl(d.url)
+            }))
+          }));
+
+          finalSettings = importedSettings;
+          finalBuildings = importedBuildings;
+        } else {
+          // Mode === 'merge'
+          const currentSettings = readSettings();
+          const currentBuildings = readBuildings();
+
+          const existingMapIds = new Set((currentSettings.maps || []).map(m => m.id));
+          const mapIdRemap = new Map();
+
+          const importedMaps = (manifest.settings.maps || []).map((m, idx) => {
+            let targetId = m.id;
+            if (existingMapIds.has(targetId)) {
+              targetId = `page-${Date.now()}-${idx}`;
+            }
+            mapIdRemap.set(m.id, targetId);
+            existingMapIds.add(targetId);
+            return {
+              ...m,
+              id: targetId,
+              imageUrl: normalizeImportUrl(m.imageUrl)
+            };
+          });
+
+          finalSettings = {
+            ...currentSettings,
+            maps: [...(currentSettings.maps || []), ...importedMaps]
+          };
+
+          const existingBuildingIds = new Set(currentBuildings.map(b => b.id));
+          const importedBuildings = manifest.buildings.map((b, idx) => {
+            let targetId = b.id;
+            if (existingBuildingIds.has(targetId)) {
+              targetId = `b-${Date.now()}-${idx}`;
+            }
+            existingBuildingIds.add(targetId);
+
+            const remappedMapId = mapIdRemap.has(b.mapId) ? mapIdRemap.get(b.mapId) : b.mapId;
+
+            return {
+              ...b,
+              id: targetId,
+              mapId: remappedMapId,
+              documents: (b.documents || []).map(d => ({
+                ...d,
+                url: normalizeImportUrl(d.url)
+              }))
+            };
+          });
+
+          finalBuildings = [...currentBuildings, ...importedBuildings];
+        }
+
+        writeSettings(finalSettings);
+        writeBuildings(finalBuildings);
+
+        res.statusCode = 200;
+        return res.end(JSON.stringify({
+          success: true,
+          mode,
+          settings: finalSettings,
+          buildings: finalBuildings
+        }));
       }
 
       res.statusCode = 404;

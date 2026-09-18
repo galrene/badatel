@@ -34,3 +34,13 @@ export interface MapSettings {
 
 export type AppMode = 'view' | 'edit';
 export type EditTool = 'drag' | 'reshape' | 'draw';
+
+export interface ImportPreview {
+  title: string;
+  exportedAt: string | null;
+  mapCount: number;
+  buildingCount: number;
+  documentCount: number;
+  mediaFileCount: number;
+  archiveSizeBytes: number;
+}

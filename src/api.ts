@@ -1,4 +1,4 @@
-import { Building, MapSettings } from './types';
+import { Building, MapSettings, ImportPreview } from './types';
 
 export async function fetchInitialData(): Promise<{ settings: MapSettings; buildings: Building[] }> {
   const res = await fetch('/api/data');
@@ -26,14 +26,17 @@ export async function saveSettings(settings: Partial<MapSettings>): Promise<MapS
   return data.settings;
 }
 
-export async function uploadImageFile(file: File, target: 'map' | 'doc' = 'doc'): Promise<{ url: string; filename: string; width?: number; height?: number }> {
-  // Convert file to base64
-  const base64 = await new Promise<string>((resolve, reject) => {
+function fileToBase64(file: File): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+export async function uploadImageFile(file: File, target: 'map' | 'doc' = 'doc'): Promise<{ url: string; filename: string; width?: number; height?: number }> {
+  const base64 = await fileToBase64(file);
 
   const res = await fetch('/api/upload', {
     method: 'POST',
@@ -68,4 +71,37 @@ export async function fetchLocalFiles(): Promise<{ name: string; url: string; si
   } catch {
     return [];
   }
+}
+
+export function downloadProjectZip(): void {
+  const link = document.createElement('a');
+  link.href = '/api/export';
+  link.download = `badatel-backup-${new Date().toISOString().slice(0, 10)}.zip`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+export async function inspectImportZip(file: File): Promise<ImportPreview> {
+  const base64 = await fileToBase64(file);
+  const res = await fetch('/api/import/inspect', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ base64 })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to inspect backup archive');
+  return data.preview;
+}
+
+export async function executeImportZip(file: File, mode: 'replace' | 'merge'): Promise<{ settings: MapSettings; buildings: Building[] }> {
+  const base64 = await fileToBase64(file);
+  const res = await fetch('/api/import/execute', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ base64, mode })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to import backup archive');
+  return { settings: data.settings, buildings: data.buildings };
 }

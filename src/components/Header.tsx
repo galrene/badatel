@@ -1,6 +1,6 @@
 import React from 'react';
 import { AppMode, Building, MapSettings, MapPage } from '../types';
-import { Eye, Edit3, Settings, HelpCircle, Building2 } from 'lucide-react';
+import { Eye, Edit3, Settings, HelpCircle, Building2, FileArchive } from 'lucide-react';
 
 interface HeaderProps {
   settings: MapSettings;
@@ -11,6 +11,7 @@ interface HeaderProps {
   onSelectBuilding: (building: Building) => void;
   onOpenSettings: () => void;
   onOpenHelp: () => void;
+  onOpenImportExport: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectBuilding,
   onOpenSettings,
   onOpenHelp,
+  onOpenImportExport,
 }) => {
   return (
     <header className="h-16 bg-slate-900 border-b-2 border-slate-800 px-6 flex items-center justify-between select-none z-[1100] relative shadow-xl">
@@ -88,6 +90,16 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Edit Footprints</span>
           </button>
         </div>
+
+        {/* Backup / Export / Import Button */}
+        <button
+          onClick={onOpenImportExport}
+          className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border-2 border-slate-700 shadow transition flex items-center space-x-1.5"
+          title="Export / Import Project Data (.zip)"
+        >
+          <FileArchive className="w-4 h-4 text-blue-400" />
+          <span className="text-xs font-bold hidden xl:inline">Backup & Transfer</span>
+        </button>
 
         {/* Plan Settings Button */}
         <button
