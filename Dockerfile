@@ -31,15 +31,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-# Copy compiled frontend and server files from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/server ./server
-COPY --from=builder /app/server.js ./server.js
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/data ./data
+# Copy compiled frontend and server files from builder with node ownership
+COPY --chown=node:node --from=builder /app/dist ./dist
+COPY --chown=node:node --from=builder /app/server ./server
+COPY --chown=node:node --from=builder /app/server.js ./server.js
+COPY --chown=node:node --from=builder /app/public ./public
+COPY --chown=node:node --from=builder /app/data ./data
 
-# Ensure uploads and data directories exist
-RUN mkdir -p /app/public/uploads /app/data
+# Ensure uploads and data directories exist and set full non-root ownership
+RUN mkdir -p /app/public/uploads /app/data && chown -R node:node /app
+
+# Switch to unprivileged user (UID 1000)
+USER node
 
 EXPOSE 5173
 

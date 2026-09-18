@@ -6,6 +6,19 @@ export interface DocumentItem {
   uploadedAt: string;
 }
 
+export interface LocalFileItem {
+  name: string;
+  path: string;
+  subfolder: string;
+  url: string;
+  size: number;
+}
+
+export interface LocalFilesResponse {
+  files: LocalFileItem[];
+  folders: string[];
+}
+
 export interface Building {
   id: string;
   mapId: string; // which map page this building is on
