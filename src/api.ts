@@ -1,4 +1,4 @@
-import { Building, MapSettings, LocalFilesResponse } from './types';
+import { Building, MapSettings, LocalFilesResponse, AppVersionInfo } from './types';
 
 export async function fetchInitialData(): Promise<{ settings: MapSettings; buildings: Building[] }> {
   const res = await fetch('/api/data');
@@ -76,4 +76,10 @@ export async function fetchLocalFiles(): Promise<LocalFilesResponse> {
   } catch {
     return { files: [], folders: [] };
   }
+}
+
+export async function fetchVersionInfo(): Promise<AppVersionInfo> {
+  const res = await fetch('/api/version');
+  if (!res.ok) throw new Error('Failed to fetch version info');
+  return res.json();
 }

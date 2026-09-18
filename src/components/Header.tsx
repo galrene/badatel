@@ -1,6 +1,7 @@
 import React from 'react';
 import { AppMode, Building, MapSettings, MapPage } from '../types';
 import { Eye, Edit3, Settings, HelpCircle, Building2 } from 'lucide-react';
+import { BUILD_VERSION_INFO } from '../version';
 
 interface HeaderProps {
   settings: MapSettings;
@@ -31,12 +32,23 @@ export const Header: React.FC<HeaderProps> = ({
           <Building2 className="w-5 h-5" />
         </div>
         <div>
-          <h1 className="text-sm font-bold text-white tracking-wide flex items-center space-x-2">
-            <span>{settings.title}</span>
-            <span className="text-[11px] bg-slate-950 text-blue-300 px-2.5 py-0.5 rounded-full border border-slate-700 font-mono font-semibold">
-              {currentMap.title}
-            </span>
-          </h1>
+          <div className="flex items-center space-x-2">
+            <h1 className="text-sm font-bold text-white tracking-wide flex items-center space-x-2">
+              <span>{settings.title}</span>
+              <span className="text-[11px] bg-slate-950 text-blue-300 px-2.5 py-0.5 rounded-full border border-slate-700 font-mono font-semibold">
+                {currentMap.title}
+              </span>
+            </h1>
+            <button
+              onClick={onOpenHelp}
+              className="hidden sm:flex items-center space-x-1 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-blue-300 px-2 py-0.5 rounded-md border border-slate-700 font-mono font-medium transition cursor-pointer"
+              title={`Badatel v${BUILD_VERSION_INFO.version}\nCommit: ${BUILD_VERSION_INFO.shortHash} ("${BUILD_VERSION_INFO.commitMessage}")\nClick for system details`}
+            >
+              <span>v{BUILD_VERSION_INFO.version}</span>
+              <span className="text-slate-500">•</span>
+              <span className="text-blue-400">{BUILD_VERSION_INFO.shortHash}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -101,8 +113,8 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Help / Guide Button */}
         <button
           onClick={onOpenHelp}
-          className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border-2 border-slate-700 shadow transition"
-          title="How it works & instructions"
+          className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border-2 border-slate-700 shadow transition relative"
+          title={`Help & System Info\nVersion: v${BUILD_VERSION_INFO.version} (${BUILD_VERSION_INFO.shortHash})\nCommit: ${BUILD_VERSION_INFO.commitMessage}\nClick for full guide and version details`}
         >
           <HelpCircle className="w-4 h-4" />
         </button>
