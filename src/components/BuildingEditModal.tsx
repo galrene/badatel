@@ -303,31 +303,31 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
 
           {/* Attached Photographed Documentation */}
           <div className="pt-4 border-t-2 border-slate-800">
-            <div className="flex items-center justify-between mb-3">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+              <div className="min-w-0">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">Photographed Documentation</h3>
                 <p className="text-xs text-slate-400">Attach photos of blueprints, plans, permits, or inspections</p>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center flex-wrap gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowLocalBrowser(prev => !prev)}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border whitespace-nowrap shrink-0 transition shadow-sm ${
                     showLocalBrowser 
-                      ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40 shadow-sm' 
+                      ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' 
                       : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-600'
                   }`}
                   title="Browse and pick photos organized in /uploads and its subfolders"
                 >
-                  <FolderOpen className="w-3.5 h-3.5 text-yellow-400" />
+                  <FolderOpen className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
                   <span>Choose Folder File</span>
                 </button>
 
                 <label 
-                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-600 cursor-pointer transition shadow-sm"
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-600 cursor-pointer whitespace-nowrap shrink-0 transition shadow-sm"
                   title="Upload an entire folder of photos to /uploads"
                 >
-                  <FolderPlus className="w-3.5 h-3.5 text-emerald-400" />
+                  <FolderPlus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                   <span>Upload Folder</span>
                   <input
                     type="file"
@@ -338,14 +338,15 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
                     onChange={handleFolderUpload}
                     disabled={isUploading}
                     className="hidden"
+                    hidden
                   />
                 </label>
 
                 <label 
-                  className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer shadow-md transition"
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold border border-blue-500 cursor-pointer whitespace-nowrap shrink-0 shadow-sm transition"
                   title="Upload one or multiple photos"
                 >
-                  <Upload className="w-3.5 h-3.5" />
+                  <Upload className="w-3.5 h-3.5 shrink-0" />
                   <span>{uploadProgress || (isUploading ? 'Uploading...' : 'Upload Photos')}</span>
                   <input
                     type="file"
@@ -354,6 +355,7 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
                     onChange={handleFileUpload}
                     disabled={isUploading}
                     className="hidden"
+                    hidden
                   />
                 </label>
               </div>
@@ -465,7 +467,7 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
                             key={f.url}
                             type="button"
                             onClick={() => handleAddLocalFile(f)}
-                            className="flex items-center space-x-2.5 p-2 rounded-lg bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-blue-500/50 text-left text-xs text-slate-200 hover:text-white transition group"
+                            className="flex items-center space-x-2.5 p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-blue-500/50 text-left text-xs text-slate-200 hover:text-white transition group"
                             title={`Click to add: ${f.path || f.name}`}
                           >
                             <ImageIcon className="w-4 h-4 text-blue-400 shrink-0 group-hover:scale-110 transition-transform" />
@@ -506,7 +508,7 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
                     <img 
                       src={doc.url} 
                       alt={doc.title} 
-                      className="w-18 h-18 rounded-lg object-cover bg-slate-950 border-2 border-slate-600 shrink-0 shadow"
+                      className="w-16 h-16 rounded-lg object-cover bg-slate-950 border-2 border-slate-600 shrink-0 shadow"
                     />
                     <div className="flex-1 space-y-2">
                       <input
