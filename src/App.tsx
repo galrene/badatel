@@ -247,14 +247,8 @@ export const App: React.FC = () => {
         {/* Top Header */}
         <Header
           settings={settings}
-          currentMap={currentMap}
-          buildings={currentSheetBuildings}
           mode={mode}
           onToggleMode={setMode}
-          onSelectBuilding={b => {
-            if (mode === 'edit') handleEditBuilding(b);
-            else handleSelectBuilding(b);
-          }}
           onOpenSettings={handleOpenSettings}
           onOpenHelp={handleOpenHelp}
           onOpenImportExport={handleOpenImportExport}

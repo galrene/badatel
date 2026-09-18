@@ -34,7 +34,7 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
   onSave,
   onDelete
 }) => {
-  const { enqueueUploads, tasks, openMenu } = useUploadQueue();
+  const { enqueueUploads, tasks } = useUploadQueue();
   const [formData, setFormData] = useState<Building>({ ...building });
   const prevBuildingIdRef = useRef(building.id);
   const [localFiles, setLocalFiles] = useState<LocalFileItem[]>([]);
@@ -356,24 +356,22 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
                   <span>Choose Folder File</span>
                 </button>
 
-                {isBuildingUploading && (
-                  <button
-                    type="button"
-                    onClick={openMenu}
-                    className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-blue-950/90 hover:bg-blue-900 text-blue-300 border border-blue-700/80 text-xs font-semibold shadow-sm transition animate-pulse"
-                    title="Click to view upload queue and details"
-                  >
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400 shrink-0" />
-                    <span>{pendingForThisBuilding.length} uploading • View Queue</span>
-                  </button>
-                )}
-
                 <label 
-                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-600 cursor-pointer whitespace-nowrap shrink-0 transition shadow-sm"
-                  title="Upload an entire folder of photos to /uploads"
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer whitespace-nowrap shrink-0 transition shadow-sm ${
+                    isBuildingUploading
+                      ? 'bg-blue-950/80 hover:bg-blue-900/80 text-blue-300 border-blue-600/70 shadow-blue-950/30'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-600'
+                  }`}
+                  title={isBuildingUploading ? `${pendingForThisBuilding.length} uploads remaining in queue` : "Upload an entire folder of photos to /uploads"}
                 >
-                  <FolderPlus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Upload Folder</span>
+                  {isBuildingUploading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400 shrink-0" />
+                  ) : (
+                    <FolderPlus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  )}
+                  <span>
+                    {isBuildingUploading ? `${pendingForThisBuilding.length} remaining` : 'Upload Folder'}
+                  </span>
                   <input
                     type="file"
                     // @ts-expect-error webkitdirectory is supported by modern browsers

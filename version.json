@@ -1,9 +1,9 @@
 {
   "version": "0.1.0",
-  "commitHash": "4150dbf560b6b62f5120eb28621608cccb89e622",
-  "shortHash": "4150dbf",
-  "commitMessage": "feat: allow exiting modals and map drawing mode using ESC",
-  "commitDate": "2026-09-18 21:57:05 +0200",
-  "branch": "close_modal_with_esc",
-  "buildTime": "2026-09-18T20:00:16.767Z"
+  "commitHash": "1baf97d17e0e47e6160cc29f1e33d3a37226ce0f",
+  "shortHash": "1baf97d",
+  "commitMessage": "fix(import-export): import missing useEffect hook for ESC key listener",
+  "commitDate": "2026-09-18 22:00:46 +0200",
+  "branch": "top_bar_ui_cleanup",
+  "buildTime": "2026-09-18T20:18:24.083Z"
 }
