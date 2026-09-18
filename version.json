@@ -1,9 +1,9 @@
 {
   "version": "0.1.0",
-  "commitHash": "76c6b727ef84c80ce524dcea57321333ecd2329a",
-  "shortHash": "76c6b72",
-  "commitMessage": "fix: resolve allocation size overflow during large archive imports by streaming binary data",
-  "commitDate": "2026-09-18 21:00:26 +0200",
-  "branch": "main",
-  "buildTime": "2026-09-18T19:00:41.714Z"
+  "commitHash": "1d9e8c976183f51860e8febf0c2907bf3130be93",
+  "shortHash": "1d9e8c9",
+  "commitMessage": "chore: update version.json after streaming fix",
+  "commitDate": "2026-09-18 21:00:50 +0200",
+  "branch": "building_photo_selection_confirmation",
+  "buildTime": "2026-09-18T19:29:44.419Z"
 }

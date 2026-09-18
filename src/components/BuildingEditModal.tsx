@@ -4,7 +4,7 @@ import { uploadImageFile, fetchLocalFiles, rotateImage } from '../api';
 import { 
   X, Trash2, Upload, Check, AlertTriangle, 
   Image as ImageIcon, FolderOpen, RotateCw,
-  FolderPlus, Search, CheckSquare
+  FolderPlus, Search, CheckSquare, Square, Plus
 } from 'lucide-react';
 
 interface BuildingEditModalProps {
@@ -42,10 +42,12 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [showLocalBrowser, setShowLocalBrowser] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [selectedFileUrls, setSelectedFileUrls] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setFormData({ ...building });
     setConfirmDelete(false);
+    setSelectedFileUrls(new Set());
   }, [building]);
 
   useEffect(() => {
@@ -144,22 +146,45 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
     }
   };
 
-  const handleAddLocalFile = (file: LocalFileItem) => {
-    const newDoc: DocumentItem = {
-      id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      title: file.name.replace(/\.[^/.]+$/, ''),
-      description: file.subfolder ? `Folder: ${file.subfolder}` : '',
-      url: file.url,
-      uploadedAt: new Date().toISOString()
-    };
-    setFormData(prev => ({
-      ...prev,
-      documents: [...prev.documents, newDoc]
-    }));
+  const attachedUrls = new Set(formData.documents.map(d => d.url));
+
+  const toggleSelectFile = (fileUrl: string) => {
+    if (attachedUrls.has(fileUrl)) return;
+    setSelectedFileUrls(prev => {
+      const next = new Set(prev);
+      if (next.has(fileUrl)) {
+        next.delete(fileUrl);
+      } else {
+        next.add(fileUrl);
+      }
+      return next;
+    });
   };
 
-  const handleAddAllFiltered = (filesToAdd: LocalFileItem[]) => {
+  const handleToggleSelectAll = (filesToToggle: LocalFileItem[]) => {
+    const selectableUrls = filesToToggle
+      .filter(f => !attachedUrls.has(f.url))
+      .map(f => f.url);
+
+    if (selectableUrls.length === 0) return;
+
+    const allSelected = selectableUrls.every(url => selectedFileUrls.has(url));
+
+    setSelectedFileUrls(prev => {
+      const next = new Set(prev);
+      if (allSelected) {
+        selectableUrls.forEach(url => next.delete(url));
+      } else {
+        selectableUrls.forEach(url => next.add(url));
+      }
+      return next;
+    });
+  };
+
+  const handleAddSelectedFiles = () => {
+    const filesToAdd = localFiles.filter(f => selectedFileUrls.has(f.url) && !attachedUrls.has(f.url));
     if (filesToAdd.length === 0) return;
+
     const newDocs: DocumentItem[] = filesToAdd.map((file, idx) => ({
       id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${idx}`,
       title: file.name.replace(/\.[^/.]+$/, ''),
@@ -167,10 +192,13 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
       url: file.url,
       uploadedAt: new Date().toISOString()
     }));
+
     setFormData(prev => ({
       ...prev,
       documents: [...prev.documents, ...newDocs]
     }));
+
+    setSelectedFileUrls(new Set());
   };
 
   const handleRemoveDoc = (docId: string) => {
@@ -362,117 +390,171 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
             </div>
 
             {/* Local file picker popup if opened */}
-            {showLocalBrowser && (
-              <div className="mb-4 p-3 bg-slate-950 border-2 border-slate-700 rounded-xl shadow-xl space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs font-bold text-slate-200 flex items-center">
-                      <FolderOpen className="w-4 h-4 text-yellow-400 mr-1.5" />
-                      Files in /public/uploads ({localFiles.length} found)
-                    </span>
-                  </div>
-                  <button 
-                    onClick={() => setShowLocalBrowser(false)} 
-                    className="text-slate-400 hover:text-white text-xs font-semibold px-2 py-0.5 rounded hover:bg-slate-800 transition"
-                  >
-                    Close
-                  </button>
-                </div>
+            {showLocalBrowser && (() => {
+              const filtered = localFiles.filter(f => {
+                const matchesSubfolder = 
+                  selectedSubfolder === '__all__' ? true :
+                  selectedSubfolder === '__root__' ? !f.subfolder :
+                  f.subfolder === selectedSubfolder || f.subfolder.startsWith(selectedSubfolder + '/');
+                const matchesSearch = !searchFilter.trim() ? true :
+                  f.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
+                  f.subfolder.toLowerCase().includes(searchFilter.toLowerCase());
+                return matchesSubfolder && matchesSearch;
+              });
 
-                {/* Subfolder and Search Filters */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex-1 min-w-[140px]">
-                    <select
-                      value={selectedSubfolder}
-                      onChange={e => setSelectedSubfolder(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500 font-medium"
+              const selectableFiltered = filtered.filter(f => !attachedUrls.has(f.url));
+              const isAllFilteredSelected = selectableFiltered.length > 0 && selectableFiltered.every(f => selectedFileUrls.has(f.url));
+              const selectedCount = Array.from(selectedFileUrls).filter(url => !attachedUrls.has(url)).length;
+
+              return (
+                <div className="mb-4 p-3 bg-slate-950 border-2 border-slate-700 rounded-xl shadow-xl space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-bold text-slate-200 flex items-center">
+                        <FolderOpen className="w-4 h-4 text-yellow-400 mr-1.5" />
+                        Files in /public/uploads ({localFiles.length} found)
+                      </span>
+                    </div>
+                    <button 
+                      onClick={() => setShowLocalBrowser(false)} 
+                      className="text-slate-400 hover:text-white text-xs font-semibold px-2 py-0.5 rounded hover:bg-slate-800 transition"
                     >
-                      <option value="__all__">📁 All Folders ({localFiles.length} files)</option>
-                      <option value="__root__">📁 / (Root uploads)</option>
-                      {localFolders.map(f => (
-                        <option key={f} value={f}>📂 {f}</option>
-                      ))}
-                    </select>
+                      Close
+                    </button>
                   </div>
 
-                  <div className="relative flex-1 min-w-[140px]">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={searchFilter}
-                      onChange={e => setSearchFilter(e.target.value)}
-                      placeholder="Search photos..."
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
-                    />
+                  {/* Subfolder, Search Filters, and Selection Controls */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex-1 min-w-[140px]">
+                      <select
+                        value={selectedSubfolder}
+                        onChange={e => setSelectedSubfolder(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500 font-medium"
+                      >
+                        <option value="__all__">📁 All Folders ({localFiles.length} files)</option>
+                        <option value="__root__">📁 / (Root uploads)</option>
+                        {localFolders.map(f => (
+                          <option key={f} value={f}>📂 {f}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="relative flex-1 min-w-[140px]">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={searchFilter}
+                        onChange={e => setSearchFilter(e.target.value)}
+                        placeholder="Search photos..."
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    {selectableFiltered.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSelectAll(filtered)}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition shrink-0 shadow-sm"
+                        title={isAllFilteredSelected ? "Deselect all visible unattached photos" : "Select all visible unattached photos"}
+                      >
+                        {isAllFilteredSelected ? (
+                          <>
+                            <CheckSquare className="w-3.5 h-3.5 text-blue-400" />
+                            <span>Deselect All</span>
+                          </>
+                        ) : (
+                          <>
+                            <Square className="w-3.5 h-3.5 text-slate-400" />
+                            <span>Select All ({selectableFiltered.length})</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleAddSelectedFiles}
+                      disabled={selectedCount === 0}
+                      className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition shadow shrink-0 ${
+                        selectedCount > 0
+                          ? 'bg-blue-600 hover:bg-blue-500 text-white cursor-pointer shadow-blue-500/25 ring-1 ring-blue-400'
+                          : 'bg-slate-800/80 text-slate-500 border border-slate-700 cursor-not-allowed'
+                      }`}
+                      title={selectedCount > 0 ? `Add ${selectedCount} selected photo(s) to this building` : 'Select photos below to add'}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Selected {selectedCount > 0 ? `(${selectedCount})` : ''}</span>
+                    </button>
                   </div>
 
-                  {(() => {
-                    const filtered = localFiles.filter(f => {
-                      const matchesSubfolder = 
-                        selectedSubfolder === '__all__' ? true :
-                        selectedSubfolder === '__root__' ? !f.subfolder :
-                        f.subfolder === selectedSubfolder || f.subfolder.startsWith(selectedSubfolder + '/');
-                      const matchesSearch = !searchFilter.trim() ? true :
-                        f.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
-                        f.subfolder.toLowerCase().includes(searchFilter.toLowerCase());
-                      return matchesSubfolder && matchesSearch;
-                    });
+                  {localFiles.length === 0 ? (
+                    <p className="text-xs text-slate-500 py-3 text-center">
+                      No files found in public/uploads/ or its subfolders. Drop files/folders there or use Upload Photos / Upload Folder.
+                    </p>
+                  ) : filtered.length === 0 ? (
+                    <p className="text-xs text-slate-400 py-3 text-center">
+                      No files match current folder or search filter.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                      {filtered.map(f => {
+                        const isAlreadyAdded = attachedUrls.has(f.url);
+                        const isSelected = selectedFileUrls.has(f.url);
 
-                    if (filtered.length > 0) {
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => handleAddAllFiltered(filtered)}
-                          className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow shrink-0"
-                          title="Attach all matching photos to this building"
-                        >
-                          <CheckSquare className="w-3.5 h-3.5" />
-                          <span>Add All ({filtered.length})</span>
-                        </button>
-                      );
-                    }
-                    return null;
-                  })()}
-                </div>
-
-                {localFiles.length === 0 ? (
-                  <p className="text-xs text-slate-500 py-3 text-center">
-                    No files found in public/uploads/ or its subfolders. Drop files/folders there or use Upload Photos / Upload Folder.
-                  </p>
-                ) : (
-                  (() => {
-                    const filtered = localFiles.filter(f => {
-                      const matchesSubfolder = 
-                        selectedSubfolder === '__all__' ? true :
-                        selectedSubfolder === '__root__' ? !f.subfolder :
-                        f.subfolder === selectedSubfolder || f.subfolder.startsWith(selectedSubfolder + '/');
-                      const matchesSearch = !searchFilter.trim() ? true :
-                        f.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
-                        f.subfolder.toLowerCase().includes(searchFilter.toLowerCase());
-                      return matchesSubfolder && matchesSearch;
-                    });
-
-                    if (filtered.length === 0) {
-                      return (
-                        <p className="text-xs text-slate-400 py-3 text-center">
-                          No files match current folder or search filter.
-                        </p>
-                      );
-                    }
-
-                    return (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
-                        {filtered.map(f => (
-                          <button
+                        return (
+                          <div
                             key={f.url}
-                            type="button"
-                            onClick={() => handleAddLocalFile(f)}
-                            className="flex items-center space-x-2.5 p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-blue-500/50 text-left text-xs text-slate-200 hover:text-white transition group"
-                            title={`Click to add: ${f.path || f.name}`}
+                            onClick={() => !isAlreadyAdded && toggleSelectFile(f.url)}
+                            className={`flex items-center space-x-2.5 p-2 rounded-xl border transition select-none ${
+                              isAlreadyAdded
+                                ? 'bg-slate-900/60 border-slate-800/80 opacity-60 cursor-not-allowed'
+                                : isSelected
+                                ? 'bg-blue-950/70 border-blue-500 text-white ring-1 ring-blue-500/50 cursor-pointer shadow-sm shadow-blue-900/30'
+                                : 'bg-slate-800/90 hover:bg-slate-750 border-slate-700 hover:border-slate-500 text-slate-200 hover:text-white cursor-pointer'
+                            }`}
+                            title={
+                              isAlreadyAdded
+                                ? `Already added: ${f.name}`
+                                : isSelected
+                                ? `Selected (click to unselect): ${f.name}`
+                                : `Click to select: ${f.name}`
+                            }
                           >
-                            <ImageIcon className="w-4 h-4 text-blue-400 shrink-0 group-hover:scale-110 transition-transform" />
+                            {/* Checkbox indicator */}
+                            <div className="shrink-0">
+                              {isAlreadyAdded ? (
+                                <Check className="w-4 h-4 text-emerald-400" />
+                              ) : isSelected ? (
+                                <CheckSquare className="w-4 h-4 text-blue-400" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-500" />
+                              )}
+                            </div>
+
+                            {/* 36x36 Thumbnail preview with fallback */}
+                            <div className="w-9 h-9 rounded-lg bg-slate-950 border border-slate-700 overflow-hidden shrink-0 flex items-center justify-center relative">
+                              <img
+                                src={f.url}
+                                alt=""
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                                onError={(e) => {
+                                  (e.target as HTMLElement).style.display = 'none';
+                                }}
+                              />
+                              <ImageIcon className="w-4 h-4 text-slate-600 absolute pointer-events-none -z-0" />
+                            </div>
+
+                            {/* Info */}
                             <div className="flex-1 min-w-0">
-                              <div className="truncate font-medium">{f.name}</div>
+                              <div className="truncate font-medium text-xs text-white flex items-center gap-1.5">
+                                <span className="truncate">{f.name}</span>
+                                {isAlreadyAdded && (
+                                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30 font-semibold shrink-0">
+                                    Added
+                                  </span>
+                                )}
+                              </div>
                               {f.subfolder ? (
                                 <div className="text-[10px] text-amber-400 font-mono truncate mt-0.5">
                                   📁 {f.subfolder}
@@ -483,17 +565,19 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
                                 </div>
                               )}
                             </div>
+
+                            {/* Size */}
                             <span className="text-[10px] text-slate-500 font-mono shrink-0">
                               {f.size ? `${Math.round(f.size / 1024)} KB` : ''}
                             </span>
-                          </button>
-                        ))}
-                      </div>
-                    );
-                  })()
-                )}
-              </div>
-            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Document list */}
             {formData.documents.length === 0 ? (
