@@ -8,6 +8,7 @@ export const FloatingUploadPill: React.FC = () => {
     activeCount,
     queuedCount,
     completedCount,
+    deduplicatedCount,
     isUploading,
     overallProgress,
     overallSpeed,
@@ -41,6 +42,15 @@ export const FloatingUploadPill: React.FC = () => {
   }
 
   const totalInFlight = activeCount + queuedCount;
+  const freshlyUploadedCount = Math.max(0, completedCount - deduplicatedCount);
+  const allDeduplicated = completedCount > 0 && freshlyUploadedCount === 0;
+  const isMixed = freshlyUploadedCount > 0 && deduplicatedCount > 0;
+
+  const completedTitle = allDeduplicated
+    ? (deduplicatedCount === 1 ? '1 file deduplicated (reused)' : `All ${deduplicatedCount} files deduplicated (reused)`)
+    : isMixed
+    ? `${freshlyUploadedCount} uploaded, ${deduplicatedCount} deduplicated`
+    : (completedCount === 1 ? '1 file uploaded' : 'Uploads completed');
 
   return (
     <div className="fixed bottom-6 right-6 z-[1150] select-none animate-in fade-in slide-in-from-bottom-3 duration-200">
@@ -48,7 +58,9 @@ export const FloatingUploadPill: React.FC = () => {
         onClick={openMenu}
         className={`group flex items-center space-x-3.5 px-4 py-2.5 rounded-2xl border-2 shadow-2xl backdrop-blur-md cursor-pointer transition transform hover:scale-[1.02] ${
           showRecentlyCompleted && !isUploading
-            ? 'bg-slate-900/95 border-emerald-500/60 shadow-emerald-950/40 text-white'
+            ? allDeduplicated
+              ? 'bg-slate-900/95 border-purple-500/60 shadow-purple-950/40 text-white'
+              : 'bg-slate-900/95 border-emerald-500/60 shadow-emerald-950/40 text-white'
             : 'bg-slate-900/95 border-blue-500/60 shadow-blue-950/40 text-white'
         }`}
       >
@@ -56,7 +68,9 @@ export const FloatingUploadPill: React.FC = () => {
         <div
           className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
             showRecentlyCompleted && !isUploading
-              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30'
+              ? allDeduplicated
+                ? 'bg-purple-600 text-white shadow-md shadow-purple-500/30'
+                : 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30'
               : 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
           }`}
         >
@@ -72,7 +86,9 @@ export const FloatingUploadPill: React.FC = () => {
           <div className="flex items-center justify-between text-xs font-bold space-x-2">
             <span>
               {showRecentlyCompleted && !isUploading
-                ? 'Uploads completed'
+                ? completedTitle
+                : deduplicatedCount > 0
+                ? `Uploading ${totalInFlight} file${totalInFlight === 1 ? '' : 's'} (${deduplicatedCount} reused)`
                 : `Uploading ${totalInFlight} file${totalInFlight === 1 ? '' : 's'}`}
             </span>
             <span className="font-mono text-blue-300 text-[11px]">
@@ -85,7 +101,9 @@ export const FloatingUploadPill: React.FC = () => {
             <div
               className={`h-full rounded-full transition-all duration-300 ${
                 showRecentlyCompleted && !isUploading
-                  ? 'bg-emerald-500'
+                  ? allDeduplicated
+                    ? 'bg-purple-500'
+                    : 'bg-emerald-500'
                   : 'bg-gradient-to-r from-blue-500 to-indigo-500'
               }`}
               style={{ width: `${showRecentlyCompleted && !isUploading ? 100 : overallProgress}%` }}

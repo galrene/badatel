@@ -1,9 +1,9 @@
 {
   "version": "0.1.0",
-  "commitHash": "1baf97d17e0e47e6160cc29f1e33d3a37226ce0f",
-  "shortHash": "1baf97d",
-  "commitMessage": "fix(import-export): import missing useEffect hook for ESC key listener",
-  "commitDate": "2026-09-18 22:00:46 +0200",
-  "branch": "top_bar_ui_cleanup",
-  "buildTime": "2026-09-18T20:18:24.083Z"
+  "commitHash": "930adb76919788fd44ad267090d19abd1329adc8",
+  "shortHash": "930adb7",
+  "commitMessage": "Merge branch 'global_upload_status_menu'",
+  "commitDate": "2026-09-18 21:48:29 +0200",
+  "branch": "deduplicate_uploaded_data",
+  "buildTime": "2026-09-18T21:16:39.066Z"
 }

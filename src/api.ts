@@ -1,4 +1,4 @@
-import { Building, MapSettings, ImportPreview, LocalFilesResponse, AppVersionInfo } from './types';
+import { Building, MapSettings, ImportPreview, LocalFilesResponse, AppVersionInfo, HashCheckItem, HashCheckResult } from './types';
 
 export async function fetchInitialData(): Promise<{ settings: MapSettings; buildings: Building[] }> {
   const res = await fetch('/api/data');
@@ -35,11 +35,35 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+/**
+ * Computes SHA-256 hash of a file client-side in milliseconds using Web Crypto API
+ */
+export async function computeFileHash(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Checks with the server if files with the given hashes already exist in uploads
+ */
+export async function checkDuplicateHashes(items: HashCheckItem[]): Promise<HashCheckResult[]> {
+  const res = await fetch('/api/upload/check-hashes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  });
+  if (!res.ok) throw new Error('Failed to check duplicate hashes');
+  const data = await res.json();
+  return data.results || [];
+}
+
 export async function uploadImageFile(
   file: File,
   target: 'map' | 'doc' = 'doc',
   subfolder?: string
-): Promise<{ url: string; filename: string; width?: number; height?: number; subfolder?: string }> {
+): Promise<{ url: string; filename: string; width?: number; height?: number; subfolder?: string; deduplicated?: boolean }> {
   const base64 = await fileToBase64(file);
 
   const res = await fetch('/api/upload', {
@@ -74,7 +98,7 @@ export interface UploadFileOptions {
 export function uploadFileWithProgress(
   file: File,
   options: UploadFileOptions = {}
-): Promise<{ url: string; filename: string; originalName?: string; width?: number; height?: number; subfolder?: string }> {
+): Promise<{ url: string; filename: string; originalName?: string; width?: number; height?: number; subfolder?: string; deduplicated?: boolean }> {
   return new Promise(async (resolve, reject) => {
     try {
       if (options.signal?.aborted) {
