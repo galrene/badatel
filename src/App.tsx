@@ -75,6 +75,17 @@ export const App: React.FC = () => {
     });
   }, []);
 
+  // Check if a document with this URL is already attached to the target building
+  const isDocumentAttached = useCallback((buildingId: string, url: string) => {
+    const cleanUrl = url.split('?')[0];
+    if (editingBuilding && editingBuilding.id === buildingId) {
+      if (editingBuilding.documents.some(d => d.url.split('?')[0] === cleanUrl)) return true;
+    }
+    const b = buildings.find(item => item.id === buildingId);
+    if (!b) return false;
+    return b.documents.some(d => d.url.split('?')[0] === cleanUrl);
+  }, [buildings, editingBuilding]);
+
   // Modal open/close and building selection handlers
   const handleSelectBuilding = useCallback((b: Building) => {
     setViewingBuilding(b);
@@ -242,7 +253,7 @@ export const App: React.FC = () => {
   const currentSheetBuildings = buildings.filter(b => (b.mapId || currentMap.id) === currentMap.id);
 
   return (
-    <UploadProvider onDocumentCompleted={handleDocumentCompleted}>
+    <UploadProvider onDocumentCompleted={handleDocumentCompleted} isDocumentAttached={isDocumentAttached}>
       <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950">
         {/* Top Header */}
         <Header

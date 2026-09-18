@@ -21,6 +21,7 @@ export const UploadQueueMenu: React.FC = () => {
     activeCount,
     queuedCount,
     completedCount,
+    deduplicatedCount,
     errorCount,
     isUploading,
     overallProgress,
@@ -61,6 +62,7 @@ export const UploadQueueMenu: React.FC = () => {
   }, [isMenuOpen, setIsMenuOpen]);
 
   const totalInFlight = activeCount + queuedCount;
+  const freshlyUploadedCount = Math.max(0, completedCount - deduplicatedCount);
   const hasItemsToClear = completedCount > 0 || tasks.some(t => t.status === 'cancelled');
 
   return (
@@ -77,7 +79,7 @@ export const UploadQueueMenu: React.FC = () => {
             ? 'bg-slate-700 text-white border-slate-600'
             : 'bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border-slate-700 shadow'
         }`}
-        title={`Upload Queue & Status (${totalInFlight} in progress, ${completedCount} done, ${errorCount} errors)`}
+        title={`Upload Queue & Status (${totalInFlight} in progress, ${completedCount} done${deduplicatedCount > 0 ? ` [${deduplicatedCount} deduplicated]` : ''}, ${errorCount} errors)`}
       >
         {isUploading ? (
           <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
@@ -161,7 +163,10 @@ export const UploadQueueMenu: React.FC = () => {
               <div className="mt-3 space-y-1.5">
                 <div className="flex items-center justify-between text-[11px] text-slate-400">
                   <span className="text-slate-300 font-medium">
-                    Uploading {activeCount + completedCount} of {tasks.filter(t => t.status !== 'cancelled').length} files
+                    Processing {activeCount + completedCount} of {tasks.filter(t => t.status !== 'cancelled').length} files
+                    {deduplicatedCount > 0 && (
+                      <span className="text-purple-300 font-normal"> ({deduplicatedCount} deduplicated)</span>
+                    )}
                   </span>
                   <span className="font-mono text-blue-300">
                     {overallProgress}% {overallSpeed > 0 && `• ${formatBytes(overallSpeed)}/s`}
@@ -173,6 +178,29 @@ export const UploadQueueMenu: React.FC = () => {
                     style={{ width: `${overallProgress}%` }}
                   />
                 </div>
+              </div>
+            )}
+
+            {/* Completed Summary Banner (when queue not active) */}
+            {!isUploading && (completedCount > 0 || errorCount > 0) && (
+              <div className="mt-3 py-1.5 px-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between text-xs">
+                <div className="flex items-center space-x-2 min-w-0">
+                  <CheckCircle2 className={`w-3.5 h-3.5 flex-shrink-0 ${
+                    completedCount > 0 && freshlyUploadedCount === 0
+                      ? 'text-purple-400'
+                      : 'text-emerald-400'
+                  }`} />
+                  <span className="text-slate-200 font-medium truncate">
+                    {completedCount > 0 && freshlyUploadedCount === 0
+                      ? `All ${completedCount} file${completedCount === 1 ? '' : 's'} deduplicated (reused)`
+                      : deduplicatedCount > 0
+                      ? `${freshlyUploadedCount} uploaded, ${deduplicatedCount} deduplicated`
+                      : `${completedCount} file${completedCount === 1 ? '' : 's'} uploaded`}
+                  </span>
+                </div>
+                {errorCount > 0 && (
+                  <span className="text-rose-400 font-medium text-[11px] flex-shrink-0 ml-2">{errorCount} failed</span>
+                )}
               </div>
             )}
           </div>
@@ -234,6 +262,16 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, onCancel, onRetry }) => {
                 /{task.subfolder}
               </span>
             )}
+
+            {task.isAlreadyAttached ? (
+              <span className="inline-flex items-center text-[10px] font-semibold bg-cyan-950/80 text-cyan-300 px-1.5 py-0.2 rounded border border-cyan-800/60">
+                Already attached
+              </span>
+            ) : task.isDuplicate ? (
+              <span className="inline-flex items-center text-[10px] font-semibold bg-purple-950/80 text-purple-300 px-1.5 py-0.2 rounded border border-purple-800/60">
+                Deduplicated
+              </span>
+            ) : null}
           </div>
 
           <p className="text-xs font-semibold text-slate-200 truncate" title={task.filename}>
@@ -308,8 +346,22 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, onCancel, onRetry }) => {
 
           {task.status === 'completed' && (
             <>
-              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-              <span className="text-emerald-400 font-medium">Uploaded</span>
+              {task.isAlreadyAttached ? (
+                <>
+                  <CheckCircle2 className="w-3 h-3 text-cyan-400" />
+                  <span className="text-cyan-300 font-medium">Already attached (skipped)</span>
+                </>
+              ) : task.isDuplicate ? (
+                <>
+                  <CheckCircle2 className="w-3 h-3 text-purple-400" />
+                  <span className="text-purple-300 font-medium">Deduplicated (reused)</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                  <span className="text-emerald-400 font-medium">Uploaded (new file)</span>
+                </>
+              )}
             </>
           )}
 

@@ -12,6 +12,26 @@ export interface LocalFileItem {
   subfolder: string;
   url: string;
   size: number;
+  hash?: string | null;
+}
+
+export interface HashCheckItem {
+  hash: string;
+  filename: string;
+  size: number;
+  subfolder?: string;
+  target?: 'map' | 'doc';
+}
+
+export interface HashCheckResult {
+  hash: string;
+  exists: boolean;
+  url?: string;
+  filename?: string;
+  subfolder?: string;
+  width?: number | null;
+  height?: number | null;
+  deduplicated?: boolean;
 }
 
 export interface LocalFilesResponse {

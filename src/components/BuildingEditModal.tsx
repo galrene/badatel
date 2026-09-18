@@ -131,10 +131,27 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
     e.target.value = '';
   };
 
-  const attachedUrls = new Set(formData.documents.map(d => d.url));
+  const attachedUrls = new Set(formData.documents.map(d => d.url.split('?')[0]));
+
+  const attachedHashes = new Set<string>();
+  localFiles.forEach(f => {
+    if (f.hash && attachedUrls.has(f.url.split('?')[0])) {
+      attachedHashes.add(f.hash);
+    }
+  });
+
+  const isFileAttached = (file: LocalFileItem) => {
+    const cleanUrl = file.url.split('?')[0];
+    if (attachedUrls.has(cleanUrl)) return true;
+    if (file.hash && attachedHashes.has(file.hash)) return true;
+    return false;
+  };
 
   const toggleSelectFile = (fileUrl: string) => {
-    if (attachedUrls.has(fileUrl)) return;
+    const targetFile = localFiles.find(f => f.url === fileUrl);
+    if (targetFile && isFileAttached(targetFile)) return;
+    if (!targetFile && attachedUrls.has(fileUrl.split('?')[0])) return;
+
     setSelectedFileUrls(prev => {
       const next = new Set(prev);
       if (next.has(fileUrl)) {
@@ -148,7 +165,7 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
 
   const handleToggleSelectAll = (filesToToggle: LocalFileItem[]) => {
     const selectableUrls = filesToToggle
-      .filter(f => !attachedUrls.has(f.url))
+      .filter(f => !isFileAttached(f))
       .map(f => f.url);
 
     if (selectableUrls.length === 0) return;
@@ -167,7 +184,7 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
   };
 
   const handleAddSelectedFiles = () => {
-    const filesToAdd = localFiles.filter(f => selectedFileUrls.has(f.url) && !attachedUrls.has(f.url));
+    const filesToAdd = localFiles.filter(f => selectedFileUrls.has(f.url) && !isFileAttached(f));
     if (filesToAdd.length === 0) return;
 
     const newDocs: DocumentItem[] = filesToAdd.map((file, idx) => ({
@@ -397,9 +414,12 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
                 return matchesSubfolder && matchesSearch;
               });
 
-              const selectableFiltered = filtered.filter(f => !attachedUrls.has(f.url));
+              const selectableFiltered = filtered.filter(f => !isFileAttached(f));
               const isAllFilteredSelected = selectableFiltered.length > 0 && selectableFiltered.every(f => selectedFileUrls.has(f.url));
-              const selectedCount = Array.from(selectedFileUrls).filter(url => !attachedUrls.has(url)).length;
+              const selectedCount = Array.from(selectedFileUrls).filter(url => {
+                const f = localFiles.find(x => x.url === url);
+                return f ? !isFileAttached(f) : !attachedUrls.has(url.split('?')[0]);
+              }).length;
 
               return (
                 <div className="mb-4 p-3 bg-slate-950 border-2 border-slate-700 rounded-xl shadow-xl space-y-3">
@@ -493,7 +513,8 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
                       {filtered.map(f => {
-                        const isAlreadyAdded = attachedUrls.has(f.url);
+                        const isAlreadyAdded = isFileAttached(f);
+                        const isDuplicateHash = Boolean(f.hash && attachedHashes.has(f.hash) && !attachedUrls.has(f.url.split('?')[0]));
                         const isSelected = selectedFileUrls.has(f.url);
 
                         return (
@@ -509,7 +530,9 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
                             }`}
                             title={
                               isAlreadyAdded
-                                ? `Already added: ${f.name}`
+                                ? isDuplicateHash
+                                  ? `Already added (same content in another folder): ${f.name}`
+                                  : `Already added: ${f.name}`
                                 : isSelected
                                 ? `Selected (click to unselect): ${f.name}`
                                 : `Click to select: ${f.name}`
@@ -545,8 +568,12 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
                               <div className="truncate font-medium text-xs text-white flex items-center gap-1.5">
                                 <span className="truncate">{f.name}</span>
                                 {isAlreadyAdded && (
-                                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30 font-semibold shrink-0">
-                                    Added
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0 border ${
+                                    isDuplicateHash
+                                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                                      : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                  }`}>
+                                    {isDuplicateHash ? 'Duplicate' : 'Added'}
                                   </span>
                                 )}
                               </div>

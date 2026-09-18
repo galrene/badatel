@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
-import { uploadFileWithProgress } from '../api';
+import { uploadFileWithProgress, computeFileHash, checkDuplicateHashes } from '../api';
 import { DocumentItem } from '../types';
 
 export type UploadStatus = 'queued' | 'uploading' | 'processing' | 'completed' | 'error' | 'cancelled';
@@ -23,6 +23,8 @@ export interface UploadTask {
   resultHeight?: number;
   startedAt?: number;
   completedAt?: number;
+  isDuplicate?: boolean;
+  isAlreadyAttached?: boolean;
 }
 
 export interface EnqueueOptions {
@@ -37,6 +39,7 @@ interface UploadContextType {
   activeCount: number;
   queuedCount: number;
   completedCount: number;
+  deduplicatedCount: number;
   errorCount: number;
   isUploading: boolean;
   overallProgress: number;
@@ -61,9 +64,10 @@ const MAX_CONCURRENT = 2;
 export interface UploadProviderProps {
   children: React.ReactNode;
   onDocumentCompleted?: (buildingId: string, doc: DocumentItem) => void;
+  isDocumentAttached?: (buildingId: string, url: string) => boolean;
 }
 
-export const UploadProvider: React.FC<UploadProviderProps> = ({ children, onDocumentCompleted }) => {
+export const UploadProvider: React.FC<UploadProviderProps> = ({ children, onDocumentCompleted, isDocumentAttached }) => {
   const [tasks, setTasks] = useState<UploadTask[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -75,6 +79,9 @@ export const UploadProvider: React.FC<UploadProviderProps> = ({ children, onDocu
 
   const onDocumentCompletedRef = useRef(onDocumentCompleted);
   onDocumentCompletedRef.current = onDocumentCompleted;
+
+  const isDocumentAttachedRef = useRef(isDocumentAttached);
+  isDocumentAttachedRef.current = isDocumentAttached;
 
   // Registered document completion handlers
   const docHandlersRef = useRef<Set<(buildingId: string, doc: DocumentItem) => void>>(new Set());
@@ -131,48 +138,100 @@ export const UploadProvider: React.FC<UploadProviderProps> = ({ children, onDocu
     });
 
     try {
-      const res = await uploadFileWithProgress(task.file, {
-        target: task.target,
-        subfolder: task.subfolder,
-        signal: abortController.signal,
-        onProgress: (info) => {
-          const now = Date.now();
-          const lastUpdate = lastProgressUpdateRef.current.get(taskId) || 0;
-          const shouldUpdateState = now - lastUpdate >= 100 || info.percent === 100;
+      let isDuplicate = false;
+      let res: { url: string; filename: string; originalName?: string; width?: number; height?: number; subfolder?: string; deduplicated?: boolean } | null = null;
 
-          const timeDelta = (now - lastTime) / 1000;
-          let speed = 0;
-          if (timeDelta > 0.4) {
-            const fileBytes = Math.min(task.file.size, Math.round((info.loaded / info.total) * task.file.size));
-            speed = Math.max(0, (fileBytes - lastBytes) / timeDelta);
-            lastBytes = fileBytes;
-            lastTime = now;
-          }
+      // 1. Client-side pre-flight hash check
+      // Computes SHA-256 in browser to skip upload payload if duplicate exists on server
+      try {
+        const hash = await computeFileHash(task.file);
+        if (abortController.signal.aborted) {
+          throw new DOMException('Aborted', 'AbortError');
+        }
 
-          if (shouldUpdateState) {
-            lastProgressUpdateRef.current.set(taskId, now);
-            const currentFileBytes = Math.min(task.file.size, Math.round((info.loaded / info.total) * task.file.size));
+        const checkResults = await checkDuplicateHashes([{
+          hash,
+          filename: task.filename,
+          size: task.file.size,
+          subfolder: task.subfolder,
+          target: task.target
+        }]);
+
+        const match = checkResults.find(r => r.hash === hash && r.exists);
+        if (match && match.url) {
+          isDuplicate = true;
+          res = {
+            url: match.url,
+            filename: match.filename || task.filename,
+            width: match.width ?? undefined,
+            height: match.height ?? undefined,
+            subfolder: match.subfolder,
+            deduplicated: true
+          };
+        }
+      } catch (hashErr: any) {
+        if (hashErr.name === 'AbortError') throw hashErr;
+        console.warn('Pre-flight hash check error, proceeding to full upload:', hashErr);
+      }
+
+      // 2. Full network upload if not found in pre-flight check
+      if (!res) {
+        res = await uploadFileWithProgress(task.file, {
+          target: task.target,
+          subfolder: task.subfolder,
+          signal: abortController.signal,
+          onProgress: (info) => {
+            const now = Date.now();
+            const lastUpdate = lastProgressUpdateRef.current.get(taskId) || 0;
+            const shouldUpdateState = now - lastUpdate >= 100 || info.percent === 100;
+
+            const timeDelta = (now - lastTime) / 1000;
+            let speed = 0;
+            if (timeDelta > 0.4) {
+              const fileBytes = Math.min(task.file.size, Math.round((info.loaded / info.total) * task.file.size));
+              speed = Math.max(0, (fileBytes - lastBytes) / timeDelta);
+              lastBytes = fileBytes;
+              lastTime = now;
+            }
+
+            if (shouldUpdateState) {
+              lastProgressUpdateRef.current.set(taskId, now);
+              const currentFileBytes = Math.min(task.file.size, Math.round((info.loaded / info.total) * task.file.size));
+              updateTask(taskId, {
+                progress: info.percent,
+                loadedBytes: currentFileBytes,
+                totalBytes: task.file.size,
+                ...(speed > 0 ? { speedBytesPerSec: speed } : {})
+              });
+            }
+          },
+          onProcessing: () => {
             updateTask(taskId, {
-              progress: info.percent,
-              loadedBytes: currentFileBytes,
-              totalBytes: task.file.size,
-              ...(speed > 0 ? { speedBytesPerSec: speed } : {})
+              status: 'processing',
+              progress: 100,
+              loadedBytes: task.file.size
             });
           }
-        },
-        onProcessing: () => {
-          updateTask(taskId, {
-            status: 'processing',
-            progress: 100,
-            loadedBytes: task.file.size
-          });
+        });
+
+        if (res.deduplicated) {
+          isDuplicate = true;
         }
-      });
+      }
 
       activeControllersRef.current.delete(taskId);
       lastProgressUpdateRef.current.delete(taskId);
 
       const completedAt = Date.now();
+
+      // Check if document is already attached to this target building
+      let isAlreadyAttached = false;
+      if (task.target === 'doc' && task.targetId && isDocumentAttachedRef.current) {
+        isAlreadyAttached = isDocumentAttachedRef.current(task.targetId, res.url);
+      }
+
+      const isDup = Boolean(isDuplicate || res.deduplicated || isAlreadyAttached);
+
       updateTask(taskId, {
         status: 'completed',
         progress: 100,
@@ -181,11 +240,13 @@ export const UploadProvider: React.FC<UploadProviderProps> = ({ children, onDocu
         resultWidth: res.width,
         resultHeight: res.height,
         completedAt,
-        speedBytesPerSec: 0
+        speedBytesPerSec: 0,
+        isDuplicate: isDup,
+        isAlreadyAttached: Boolean(isAlreadyAttached)
       });
 
-      // If document upload with building target, trigger handlers
-      if (task.target === 'doc' && task.targetId) {
+      // If document upload with building target, trigger handlers only if not already attached
+      if (task.target === 'doc' && task.targetId && !isAlreadyAttached) {
         const newDoc: DocumentItem = {
           id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           title: task.file.name.replace(/\.[^/.]+$/, ''),
@@ -295,6 +356,7 @@ export const UploadProvider: React.FC<UploadProviderProps> = ({ children, onDocu
   const activeCount = tasks.filter(t => t.status === 'uploading' || t.status === 'processing').length;
   const queuedCount = tasks.filter(t => t.status === 'queued').length;
   const completedCount = tasks.filter(t => t.status === 'completed').length;
+  const deduplicatedCount = tasks.filter(t => t.status === 'completed' && (t.isDuplicate || t.isAlreadyAttached)).length;
   const errorCount = tasks.filter(t => t.status === 'error').length;
   const isUploading = activeCount + queuedCount > 0;
 
@@ -320,6 +382,7 @@ export const UploadProvider: React.FC<UploadProviderProps> = ({ children, onDocu
       activeCount,
       queuedCount,
       completedCount,
+      deduplicatedCount,
       errorCount,
       isUploading,
       overallProgress,
@@ -341,6 +404,7 @@ export const UploadProvider: React.FC<UploadProviderProps> = ({ children, onDocu
       activeCount,
       queuedCount,
       completedCount,
+      deduplicatedCount,
       errorCount,
       isUploading,
       overallProgress,

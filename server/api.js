@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import crypto from 'node:crypto';
 import sharp from 'sharp';
 import heicConvert from 'heic-convert';
 import AdmZip from 'adm-zip';
@@ -21,12 +22,335 @@ const BUILDINGS_FILE = path.join(DATA_DIR, 'buildings.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const UPLOADS_DIR = path.join(rootDir, 'public', 'uploads');
 const SAMPLE_DIR = path.join(rootDir, 'public', 'sample-map');
+const FILE_HASHES_FILE = path.join(DATA_DIR, '.file_hashes.json');
 
 // Ensure directories exist
 for (const dir of [DATA_DIR, BACKUP_DIR, TEMP_DIR, UPLOADS_DIR, SAMPLE_DIR]) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
+}
+
+// In-memory hash index
+// hashIndex: sha256 -> Array<{ fullPath, relPath, filename, subfolder, url, size, mtimeMs, width, height }>
+// fileIndex: fullPath -> { hash, size, mtimeMs }
+let hashIndexLoaded = false;
+const hashIndex = new Map();
+const fileIndex = new Map();
+
+function computeBufferHash(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest('hex');
+}
+
+function computeFileHash(filePath) {
+  const buf = fs.readFileSync(filePath);
+  return computeBufferHash(buf);
+}
+
+function loadHashIndexFromDisk() {
+  if (hashIndexLoaded) return;
+  hashIndexLoaded = true;
+  try {
+    if (fs.existsSync(FILE_HASHES_FILE)) {
+      const data = JSON.parse(fs.readFileSync(FILE_HASHES_FILE, 'utf8'));
+      for (const [hash, entries] of Object.entries(data)) {
+        if (Array.isArray(entries)) {
+          hashIndex.set(hash, entries);
+          for (const entry of entries) {
+            if (entry.fullPath) {
+              fileIndex.set(entry.fullPath, { hash, size: entry.size, mtimeMs: entry.mtimeMs });
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to read .file_hashes.json, rebuilding index:', err.message);
+  }
+}
+
+function saveHashIndexToDisk() {
+  try {
+    const obj = {};
+    for (const [hash, entries] of hashIndex.entries()) {
+      obj[hash] = entries;
+    }
+    fs.writeFileSync(FILE_HASHES_FILE, JSON.stringify(obj, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('Failed to save .file_hashes.json:', err.message);
+  }
+}
+
+async function inspectImageDimensions(filePath) {
+  try {
+    const ext = path.extname(filePath).toLowerCase();
+    if (['.jpg', '.jpeg', '.png', '.webp', '.svg', '.gif'].includes(ext)) {
+      const meta = await sharp(filePath).metadata();
+      return { width: meta.width || null, height: meta.height || null };
+    }
+  } catch {}
+  return { width: null, height: null };
+}
+
+async function syncHashIndexWithDisk() {
+  loadHashIndexFromDisk();
+
+  const currentFiles = new Map();
+  function walkDir(dir, relFolder = '') {
+    if (!fs.existsSync(dir)) return;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const ent of entries) {
+      if (ent.name.startsWith('.')) continue;
+      const full = path.join(dir, ent.name);
+      const rel = relFolder ? `${relFolder}/${ent.name}` : ent.name;
+      if (ent.isDirectory()) {
+        walkDir(full, rel);
+      } else if (ent.isFile()) {
+        const ext = path.extname(ent.name).toLowerCase();
+        const validExts = ['.jpg', '.jpeg', '.png', '.webp', '.svg', '.pdf', '.gif'];
+        if (validExts.includes(ext)) {
+          const stat = fs.statSync(full);
+          currentFiles.set(full, {
+            stat,
+            relPath: rel,
+            subfolder: relFolder.replace(/\\/g, '/'),
+            filename: ent.name
+          });
+        }
+      }
+    }
+  }
+  walkDir(UPLOADS_DIR);
+
+  let changed = false;
+
+  // Prune deleted files
+  for (const [hash, entries] of Array.from(hashIndex.entries())) {
+    const valid = [];
+    for (const e of entries) {
+      if (currentFiles.has(e.fullPath)) {
+        valid.push(e);
+      } else {
+        fileIndex.delete(e.fullPath);
+        changed = true;
+      }
+    }
+    if (valid.length === 0) {
+      hashIndex.delete(hash);
+    } else if (valid.length !== entries.length) {
+      hashIndex.set(hash, valid);
+    }
+  }
+
+  // Index new or modified files
+  for (const [fullPath, info] of currentFiles.entries()) {
+    const cached = fileIndex.get(fullPath);
+    if (!cached || cached.size !== info.stat.size || Math.abs(cached.mtimeMs - info.stat.mtimeMs) > 1000) {
+      try {
+        const hash = computeFileHash(fullPath);
+        const dims = await inspectImageDimensions(fullPath);
+        const urlSegments = info.relPath.split('/').map(s => encodeURIComponent(s)).join('/');
+        const entry = {
+          fullPath,
+          relPath: info.relPath,
+          filename: info.filename,
+          subfolder: info.subfolder,
+          url: `/uploads/${urlSegments}`,
+          size: info.stat.size,
+          mtimeMs: info.stat.mtimeMs,
+          width: dims.width,
+          height: dims.height
+        };
+
+        if (cached && cached.hash && cached.hash !== hash) {
+          const oldList = hashIndex.get(cached.hash) || [];
+          hashIndex.set(cached.hash, oldList.filter(e => e.fullPath !== fullPath));
+        }
+
+        fileIndex.set(fullPath, { hash, size: info.stat.size, mtimeMs: info.stat.mtimeMs });
+        const list = hashIndex.get(hash) || [];
+        const existingIdx = list.findIndex(e => e.fullPath === fullPath);
+        if (existingIdx >= 0) {
+          list[existingIdx] = entry;
+        } else {
+          list.push(entry);
+        }
+        hashIndex.set(hash, list);
+        changed = true;
+      } catch (err) {
+        console.warn('Failed to hash file:', fullPath, err.message);
+      }
+    }
+  }
+
+  if (changed) {
+    saveHashIndexToDisk();
+  }
+}
+
+function findExistingEntryByHash(hash) {
+  loadHashIndexFromDisk();
+  const entries = hashIndex.get(hash);
+  if (!entries || entries.length === 0) return null;
+  for (const e of entries) {
+    if (fs.existsSync(e.fullPath)) {
+      return e;
+    }
+  }
+  return null;
+}
+
+function updateFileEntryHash(fullPath, newBuffer, width = null, height = null) {
+  try {
+    const stat = fs.statSync(fullPath);
+    const newHash = computeBufferHash(newBuffer);
+    const oldInfo = fileIndex.get(fullPath);
+    if (oldInfo && oldInfo.hash) {
+      const oldList = hashIndex.get(oldInfo.hash) || [];
+      const filtered = oldList.filter(e => e.fullPath !== fullPath);
+      if (filtered.length === 0) {
+        hashIndex.delete(oldInfo.hash);
+      } else {
+        hashIndex.set(oldInfo.hash, filtered);
+      }
+    }
+
+    fileIndex.set(fullPath, { hash: newHash, size: stat.size, mtimeMs: stat.mtimeMs });
+    const rel = path.relative(UPLOADS_DIR, fullPath).replace(/\\/g, '/');
+    const subfolder = path.dirname(rel) === '.' ? '' : path.dirname(rel);
+    const urlSegments = rel.split('/').map(s => encodeURIComponent(s)).join('/');
+    const entry = {
+      fullPath,
+      relPath: rel,
+      filename: path.basename(fullPath),
+      subfolder,
+      url: `/uploads/${urlSegments}`,
+      size: stat.size,
+      mtimeMs: stat.mtimeMs,
+      width,
+      height
+    };
+
+    const list = hashIndex.get(newHash) || [];
+    const existingIdx = list.findIndex(e => e.fullPath === fullPath);
+    if (existingIdx >= 0) {
+      list[existingIdx] = entry;
+    } else {
+      list.push(entry);
+    }
+    hashIndex.set(newHash, list);
+    saveHashIndexToDisk();
+  } catch (err) {
+    console.warn('Error updating file hash:', err);
+  }
+}
+
+async function getOrLinkFileForSubfolder({ hash, targetSubfolder = '', preferredFilename, width = null, height = null }) {
+  await syncHashIndexWithDisk();
+  const existing = findExistingEntryByHash(hash);
+  if (!existing) return null;
+
+  const normalizedSubfolder = targetSubfolder ? targetSubfolder.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '') : '';
+  const entries = hashIndex.get(hash) || [];
+
+  // Check if an entry with this hash already exists in this target subfolder
+  const inSubfolder = entries.find(e => {
+    const eSub = (e.subfolder || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    return eSub === normalizedSubfolder && fs.existsSync(e.fullPath);
+  });
+  if (inSubfolder) {
+    return {
+      exists: true,
+      deduplicated: true,
+      url: inSubfolder.url,
+      filename: inSubfolder.filename,
+      subfolder: inSubfolder.subfolder,
+      width: inSubfolder.width || width,
+      height: inSubfolder.height || height
+    };
+  }
+
+  // If no target subfolder requested and file is already in root:
+  if (!normalizedSubfolder && (!existing.subfolder || existing.subfolder === '')) {
+    return {
+      exists: true,
+      deduplicated: true,
+      url: existing.url,
+      filename: existing.filename,
+      subfolder: existing.subfolder,
+      width: existing.width || width,
+      height: existing.height || height
+    };
+  }
+
+  // Link into normalizedSubfolder
+  const targetDir = normalizedSubfolder ? path.join(UPLOADS_DIR, normalizedSubfolder) : UPLOADS_DIR;
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+
+  // Clean filename and handle collisions
+  const ext = path.extname(preferredFilename || existing.filename) || path.extname(existing.filename);
+  const baseName = path.basename(preferredFilename || existing.filename, ext).replace(/[^a-zA-Z0-9._-]/g, '_');
+
+  let candidateName = `${baseName}${ext}`;
+  let candidatePath = path.join(targetDir, candidateName);
+  let counter = 1;
+
+  while (fs.existsSync(candidatePath)) {
+    // If candidate path has the exact same content/hash, reuse it directly!
+    try {
+      const candidateHash = computeFileHash(candidatePath);
+      if (candidateHash === hash) {
+        break;
+      }
+    } catch {}
+    candidateName = `${baseName}_${counter}${ext}`;
+    candidatePath = path.join(targetDir, candidateName);
+    counter++;
+  }
+
+  if (!fs.existsSync(candidatePath)) {
+    try {
+      fs.linkSync(existing.fullPath, candidatePath);
+    } catch (linkErr) {
+      console.warn('Hardlink failed, falling back to copy:', linkErr.message);
+      fs.copyFileSync(existing.fullPath, candidatePath);
+    }
+  }
+
+  const stat = fs.statSync(candidatePath);
+  const relPath = normalizedSubfolder ? `${normalizedSubfolder}/${candidateName}` : candidateName;
+  const urlSegments = relPath.split('/').map(s => encodeURIComponent(s)).join('/');
+  const newUrl = `/uploads/${urlSegments}`;
+
+  const newEntry = {
+    fullPath: candidatePath,
+    relPath,
+    filename: candidateName,
+    subfolder: normalizedSubfolder,
+    url: newUrl,
+    size: stat.size,
+    mtimeMs: stat.mtimeMs,
+    width: existing.width || width,
+    height: existing.height || height
+  };
+
+  fileIndex.set(candidatePath, { hash, size: stat.size, mtimeMs: stat.mtimeMs });
+  const list = hashIndex.get(hash) || [];
+  list.push(newEntry);
+  hashIndex.set(hash, list);
+  saveHashIndexToDisk();
+
+  return {
+    exists: true,
+    deduplicated: true,
+    url: newUrl,
+    filename: candidateName,
+    subfolder: normalizedSubfolder,
+    width: newEntry.width,
+    height: newEntry.height
+  };
 }
 
 /**
@@ -144,7 +468,8 @@ async function scanUploadsDirectory(baseDir, relativeFolder = '') {
           path: finalRelativePath,
           subfolder: normalizedSubfolder,
           url: `/uploads/${urlSegments}`,
-          size: stat ? stat.size : 0
+          size: stat ? stat.size : 0,
+          hash: fileIndex.get(finalFullPath)?.hash || null
         });
       }
     }
@@ -472,7 +797,62 @@ export function createApiMiddleware() {
         return res.end(JSON.stringify({ success: true, settings: updated }));
       }
 
-      // 4. POST /api/upload
+      // 4a. POST /api/upload/check-hashes
+      // Accepts { items: Array<{ hash: string, filename: string, subfolder?: string, target?: 'map' | 'doc' }> }
+      if (req.method === 'POST' && rawPathname === '/api/upload/check-hashes') {
+        const body = await parseJsonBody(req);
+        const { items } = body;
+        if (!Array.isArray(items)) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ error: 'items array required' }));
+        }
+
+        await syncHashIndexWithDisk();
+
+        const results = [];
+        for (const item of items) {
+          if (!item.hash) {
+            results.push({ hash: item.hash, exists: false });
+            continue;
+          }
+
+          let safeSub = '';
+          if (item.subfolder && typeof item.subfolder === 'string' && item.target !== 'map') {
+            const cleanSub = path.normalize(item.subfolder).replace(/^(\.\.[\/\\])+/, '').trim();
+            const segments = cleanSub.split(/[/\\]/).filter(s => s && s !== '.' && s !== '..');
+            safeSub = segments.map(s => s.replace(/[^a-zA-Z0-9._ -]/g, '_')).join('/');
+          }
+
+          const match = await getOrLinkFileForSubfolder({
+            hash: item.hash,
+            targetSubfolder: safeSub,
+            preferredFilename: item.filename
+          });
+
+          if (match) {
+            results.push({
+              hash: item.hash,
+              exists: true,
+              deduplicated: true,
+              url: match.url,
+              filename: match.filename,
+              subfolder: match.subfolder,
+              width: match.width,
+              height: match.height
+            });
+          } else {
+            results.push({
+              hash: item.hash,
+              exists: false
+            });
+          }
+        }
+
+        res.statusCode = 200;
+        return res.end(JSON.stringify({ success: true, results }));
+      }
+
+      // 4b. POST /api/upload
       // Accepts { filename: string, base64: string, target?: 'map' | 'doc', subfolder?: string }
       if (req.method === 'POST' && rawPathname === '/api/upload') {
         const body = await parseJsonBody(req);
@@ -484,13 +864,42 @@ export function createApiMiddleware() {
 
         // Sanitize subfolder to prevent directory traversal
         let safeSubfolder = '';
-        if (subfolder && typeof subfolder === 'string') {
+        if (subfolder && typeof subfolder === 'string' && target !== 'map') {
           const cleanSub = path.normalize(subfolder).replace(/^(\.\.[\/\\])+/, '').trim();
           const segments = cleanSub.split(/[/\\]/).filter(s => s && s !== '.' && s !== '..');
           safeSubfolder = segments.map(s => s.replace(/[^a-zA-Z0-9._ -]/g, '_')).join('/');
         }
 
         const safeBase = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
+        const isHeic = filename.toLowerCase().endsWith('.heic');
+
+        // Strip data:image/...;base64, prefix if present
+        const base64Data = base64.replace(/^data:[^;]+;base64,/, '');
+        const fileBuffer = Buffer.from(base64Data, 'base64');
+        const initialHash = computeBufferHash(fileBuffer);
+
+        // Check if exact file hash already exists before writing to disk (for non-HEIC files)
+        if (!isHeic) {
+          const quickExisting = await getOrLinkFileForSubfolder({
+            hash: initialHash,
+            targetSubfolder: safeSubfolder,
+            preferredFilename: safeBase
+          });
+
+          if (quickExisting) {
+            res.statusCode = 200;
+            return res.end(JSON.stringify({
+              success: true,
+              url: quickExisting.url,
+              filename: quickExisting.filename,
+              subfolder: quickExisting.subfolder,
+              width: quickExisting.width,
+              height: quickExisting.height,
+              deduplicated: true
+            }));
+          }
+        }
+
         const cleanName = `${Date.now()}_${safeBase}`;
         
         let targetDir = UPLOADS_DIR;
@@ -505,10 +914,7 @@ export function createApiMiddleware() {
         }
 
         const filePath = path.join(targetDir, cleanName);
-
-        // Strip data:image/...;base64, prefix if present
-        const base64Data = base64.replace(/^data:[^;]+;base64,/, '');
-        fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+        fs.writeFileSync(filePath, fileBuffer);
 
         // If HEIC, automatically convert to JPEG and clean up original
         let finalPath = filePath;
@@ -536,10 +942,75 @@ export function createApiMiddleware() {
           console.warn('Could not read image dimensions:', metaErr.message);
         }
 
+        // Check hash of final processed file (in case HEIC conversion or EXIF normalization resulted in a duplicate)
+        const finalBuffer = fs.readFileSync(finalPath);
+        const finalHash = computeBufferHash(finalBuffer);
+        await syncHashIndexWithDisk();
+        const existingEntry = findExistingEntryByHash(finalHash);
+
+        if (existingEntry && existingEntry.fullPath !== finalPath) {
+          // A matching file already exists elsewhere in uploads!
+          // Remove newly created redundant file and link to subfolder if needed
+          try { fs.unlinkSync(finalPath); } catch {}
+          const linked = await getOrLinkFileForSubfolder({
+            hash: finalHash,
+            targetSubfolder: safeSubfolder,
+            preferredFilename: finalName,
+            width,
+            height
+          });
+
+          // Also index initialHash pointing to this entry so subsequent pre-flight checks match instantly!
+          if (initialHash && initialHash !== finalHash) {
+            const rawList = hashIndex.get(initialHash) || [];
+            rawList.push({ ...linked, fullPath: existingEntry.fullPath });
+            hashIndex.set(initialHash, rawList);
+            saveHashIndexToDisk();
+          }
+
+          res.statusCode = 200;
+          return res.end(JSON.stringify({
+            success: true,
+            url: linked.url,
+            filename: linked.filename,
+            subfolder: linked.subfolder,
+            width: linked.width,
+            height: linked.height,
+            deduplicated: true
+          }));
+        }
+
+        const stat = fs.statSync(finalPath);
         const relativeUrlPath = safeSubfolder 
           ? `${safeSubfolder.split('/').map(s => encodeURIComponent(s)).join('/')}/${encodeURIComponent(finalName)}`
           : encodeURIComponent(finalName);
         const publicUrl = `/uploads/${relativeUrlPath}`;
+
+        // Register new file in hash index
+        fileIndex.set(finalPath, { hash: finalHash, size: stat.size, mtimeMs: stat.mtimeMs });
+        const list = hashIndex.get(finalHash) || [];
+        const newEntry = {
+          fullPath: finalPath,
+          relPath: safeSubfolder ? `${safeSubfolder}/${finalName}` : finalName,
+          filename: finalName,
+          subfolder: safeSubfolder,
+          url: publicUrl,
+          size: stat.size,
+          mtimeMs: stat.mtimeMs,
+          width,
+          height
+        };
+        list.push(newEntry);
+        hashIndex.set(finalHash, list);
+
+        // Also record initialHash if different from finalHash (e.g. EXIF orientation)
+        if (initialHash && initialHash !== finalHash) {
+          const rawList = hashIndex.get(initialHash) || [];
+          rawList.push(newEntry);
+          hashIndex.set(initialHash, rawList);
+        }
+
+        saveHashIndexToDisk();
 
         res.statusCode = 200;
         return res.end(JSON.stringify({
@@ -548,7 +1019,8 @@ export function createApiMiddleware() {
           filename: finalName,
           subfolder: safeSubfolder,
           width,
-          height
+          height,
+          deduplicated: false
         }));
       }
 
@@ -600,6 +1072,9 @@ export function createApiMiddleware() {
         const width = meta.width;
         const height = meta.height;
 
+        // Update hash registry with new rotated bytes and dimensions
+        updateFileEntryHash(filePath, rotatedBuffer, width, height);
+
         const cacheBustedUrl = `${imageUrl.split('?')[0]}?t=${Date.now()}`;
 
         // If it's a site map, update the specific map in settings
@@ -630,6 +1105,7 @@ export function createApiMiddleware() {
 
       // 6. GET /api/local-files
       if (req.method === 'GET' && rawPathname === '/api/local-files') {
+        await syncHashIndexWithDisk();
         const { files, folders } = await scanUploadsDirectory(UPLOADS_DIR);
         res.statusCode = 200;
         return res.end(JSON.stringify({ files, folders }));
@@ -921,6 +1397,7 @@ export function createApiMiddleware() {
             fs.writeFileSync(targetPath, entry.getData());
           }
         }
+        await syncHashIndexWithDisk();
 
         // Clean up temp archive file
         if (shouldUnlinkZip && fs.existsSync(zipPath)) {
