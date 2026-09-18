@@ -1,9 +1,9 @@
 {
   "version": "0.1.0",
-  "commitHash": "930adb76919788fd44ad267090d19abd1329adc8",
-  "shortHash": "930adb7",
-  "commitMessage": "Merge branch 'global_upload_status_menu'",
-  "commitDate": "2026-09-18 21:48:29 +0200",
+  "commitHash": "4150dbf560b6b62f5120eb28621608cccb89e622",
+  "shortHash": "4150dbf",
+  "commitMessage": "feat: allow exiting modals and map drawing mode using ESC",
+  "commitDate": "2026-09-18 21:57:05 +0200",
   "branch": "close_modal_with_esc",
-  "buildTime": "2026-09-18T19:56:53.413Z"
+  "buildTime": "2026-09-18T20:00:16.767Z"
 }

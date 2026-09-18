@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { MapSettings, Building, ImportPreview } from '../types';
 import { downloadProjectZip, inspectImportZip, executeImportZip } from '../api';
 import {
