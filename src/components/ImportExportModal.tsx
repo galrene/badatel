@@ -47,6 +47,19 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   // Calculate current project stats
@@ -150,6 +163,7 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({
           <button
             onClick={onClose}
             className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition"
+            title="Close (Esc)"
           >
             <X className="w-5 h-5" />
           </button>

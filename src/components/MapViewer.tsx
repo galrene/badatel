@@ -455,6 +455,24 @@ export const MapViewer: React.FC<MapViewerProps> = ({
     }
   }, [isDrawing]);
 
+  // Cancel drawing on Escape key
+  useEffect(() => {
+    if (!isDrawing) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        const map = mapInstanceRef.current;
+        if (map && (map as any).pm) {
+          (map as any).pm.disableDraw();
+          setIsDrawing(false);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDrawing]);
+
   // Zoom controls
   const handleZoomIn = () => mapInstanceRef.current?.zoomIn();
   const handleZoomOut = () => mapInstanceRef.current?.zoomOut();

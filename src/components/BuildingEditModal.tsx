@@ -83,6 +83,25 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
   );
   const isBuildingUploading = pendingForThisBuilding.length > 0;
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (confirmDelete) {
+          setConfirmDelete(false);
+        } else if (showLocalBrowser) {
+          setShowLocalBrowser(false);
+        } else {
+          onClose();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, confirmDelete, showLocalBrowser, onClose]);
+
   if (!isOpen) return null;
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -238,6 +257,7 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
           <button 
             onClick={onClose}
             className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition"
+            title="Close (Esc)"
           >
             <X className="w-5 h-5" />
           </button>

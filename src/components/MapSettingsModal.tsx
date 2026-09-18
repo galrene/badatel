@@ -52,6 +52,23 @@ export const MapSettingsModal: React.FC<MapSettingsModalProps> = ({
     }
   }, [activeMapTask]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showAddForm) {
+          setShowAddForm(false);
+        } else {
+          onClose();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, showAddForm, onClose]);
+
   if (!isOpen) return null;
 
   const handlePageTitleChange = (id: string, title: string) => {
@@ -167,7 +184,11 @@ export const MapSettingsModal: React.FC<MapSettingsModalProps> = ({
               <p className="text-xs text-slate-400">Manage multiple pages, switch plans, or upload new sheets</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition">
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition"
+            title="Close (Esc)"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>

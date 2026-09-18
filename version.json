@@ -1,9 +1,9 @@
 {
   "version": "0.1.0",
-  "commitHash": "0949944c1e0f8030224a1670f23d0328f98bd9bb",
-  "shortHash": "0949944",
+  "commitHash": "930adb76919788fd44ad267090d19abd1329adc8",
+  "shortHash": "930adb7",
   "commitMessage": "Merge branch 'global_upload_status_menu'",
-  "commitDate": "2026-09-18 21:48:15 +0200",
-  "branch": "main",
-  "buildTime": "2026-09-18T19:48:17.872Z"
+  "commitDate": "2026-09-18 21:48:29 +0200",
+  "branch": "close_modal_with_esc",
+  "buildTime": "2026-09-18T19:56:53.413Z"
 }
