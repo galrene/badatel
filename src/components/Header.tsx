@@ -2,6 +2,7 @@ import React from 'react';
 import { AppMode, Building, MapSettings, MapPage } from '../types';
 import { Eye, Edit3, Settings, HelpCircle, Building2, FileArchive } from 'lucide-react';
 import { BUILD_VERSION_INFO } from '../version';
+import { UploadQueueMenu } from './UploadQueueMenu';
 
 interface HeaderProps {
   settings: MapSettings;
@@ -102,6 +103,9 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Edit Footprints</span>
           </button>
         </div>
+
+        {/* Global Upload Queue & Status Menu */}
+        <UploadQueueMenu />
 
         {/* Backup / Export / Import Button */}
         <button

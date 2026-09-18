@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapSettings, MapPage } from '../types';
-import { uploadImageFile, rotateImage } from '../api';
+import { rotateImage } from '../api';
+import { useUploadQueue } from '../context/UploadContext';
 import { X, Upload, Check, Map as MapIcon, RotateCw, Plus, Trash2 } from 'lucide-react';
 
 interface MapSettingsModalProps {
@@ -18,8 +19,10 @@ export const MapSettingsModal: React.FC<MapSettingsModalProps> = ({
   onSave,
   onSwitchPage
 }) => {
+  const { enqueueUploads, tasks } = useUploadQueue();
   const [formData, setFormData] = useState<MapSettings>({ ...settings });
   const [isUploading, setIsUploading] = useState(false);
+  const [activeMapTaskId, setActiveMapTaskId] = useState<string | null>(null);
 
   // New map page form state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -27,6 +30,27 @@ export const MapSettingsModal: React.FC<MapSettingsModalProps> = ({
   const [newPageFile, setNewPageFile] = useState<File | null>(null);
   const [newPagePreview, setNewPagePreview] = useState<string | null>(null);
   const [newPageDimensions, setNewPageDimensions] = useState<{ width: number; height: number } | null>(null);
+
+  const activeMapTask = activeMapTaskId ? tasks.find(t => t.id === activeMapTaskId) : null;
+
+  useEffect(() => {
+    if (!activeMapTask) return;
+    if (activeMapTask.status === 'completed' && activeMapTask.resultUrl) {
+      setNewPagePreview(activeMapTask.resultUrl);
+      if (activeMapTask.resultWidth && activeMapTask.resultHeight) {
+        setNewPageDimensions({ width: activeMapTask.resultWidth, height: activeMapTask.resultHeight });
+      }
+      setIsUploading(false);
+      setActiveMapTaskId(null);
+    } else if (activeMapTask.status === 'error') {
+      alert('Map upload failed: ' + (activeMapTask.error || 'Unknown error'));
+      setIsUploading(false);
+      setActiveMapTaskId(null);
+    } else if (activeMapTask.status === 'cancelled') {
+      setIsUploading(false);
+      setActiveMapTaskId(null);
+    }
+  }, [activeMapTask]);
 
   if (!isOpen) return null;
 
@@ -74,29 +98,23 @@ export const MapSettingsModal: React.FC<MapSettingsModalProps> = ({
     onSwitchPage(nextActive);
   };
 
-  const handleNewPageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNewPageFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setNewPageFile(file);
+    const title = newPageTitle || file.name.replace(/\.[^/.]+$/, '');
     if (!newPageTitle) {
-      setNewPageTitle(file.name.replace(/\.[^/.]+$/, ''));
+      setNewPageTitle(title);
     }
 
-    // Upload immediately to get dimensions and converted URL
-    try {
-      setIsUploading(true);
-      const res = await uploadImageFile(file, 'map');
-      setNewPagePreview(res.url);
-      if (res.width && res.height) {
-        setNewPageDimensions({ width: res.width, height: res.height });
-      }
-    } catch (err: any) {
-      alert('Upload failed: ' + (err.message || 'Unknown error'));
-    } finally {
-      setIsUploading(false);
-      e.target.value = '';
-    }
+    setIsUploading(true);
+    const [id] = enqueueUploads([file], {
+      target: 'map',
+      targetName: `Map Sheet: ${title}`
+    });
+    setActiveMapTaskId(id);
+    e.target.value = '';
   };
 
   const handleConfirmAddPage = () => {

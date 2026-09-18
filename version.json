@@ -5,5 +5,5 @@
   "commitMessage": "fix: resolve allocation size overflow during large archive imports by streaming binary data",
   "commitDate": "2026-09-18 21:00:26 +0200",
   "branch": "main",
-  "buildTime": "2026-09-18T19:00:41.714Z"
+  "buildTime": "2026-09-18T19:21:33.042Z"
 }

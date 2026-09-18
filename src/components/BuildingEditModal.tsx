@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Building, DocumentItem, LocalFileItem } from '../types';
-import { uploadImageFile, fetchLocalFiles, rotateImage } from '../api';
+import { fetchLocalFiles, rotateImage } from '../api';
+import { useUploadQueue } from '../context/UploadContext';
 import { 
   X, Trash2, Upload, Check, AlertTriangle, 
   Image as ImageIcon, FolderOpen, RotateCw,
-  FolderPlus, Search, CheckSquare
+  FolderPlus, Search, CheckSquare, Loader2
 } from 'lucide-react';
 
 interface BuildingEditModalProps {
@@ -33,9 +34,9 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
   onSave,
   onDelete
 }) => {
+  const { enqueueUploads, tasks, openMenu } = useUploadQueue();
   const [formData, setFormData] = useState<Building>({ ...building });
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  const prevBuildingIdRef = useRef(building.id);
   const [localFiles, setLocalFiles] = useState<LocalFileItem[]>([]);
   const [localFolders, setLocalFolders] = useState<string[]>([]);
   const [selectedSubfolder, setSelectedSubfolder] = useState<string>('__all__');
@@ -43,9 +44,26 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
   const [showLocalBrowser, setShowLocalBrowser] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Synchronize formData with building prop (safe against overwriting user's typed edits)
   useEffect(() => {
-    setFormData({ ...building });
-    setConfirmDelete(false);
+    if (prevBuildingIdRef.current !== building.id) {
+      prevBuildingIdRef.current = building.id;
+      setFormData({ ...building });
+      setConfirmDelete(false);
+    } else {
+      // Merge any new documents completed in background by global upload queue
+      setFormData(prev => {
+        const existingUrls = new Set(prev.documents.map(d => d.url));
+        const newDocs = building.documents.filter(d => !existingUrls.has(d.url));
+        if (newDocs.length > 0) {
+          return {
+            ...prev,
+            documents: [...prev.documents, ...newDocs]
+          };
+        }
+        return prev;
+      });
+    }
   }, [building]);
 
   useEffect(() => {
@@ -57,42 +75,28 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
     }
   }, [showLocalBrowser]);
 
+  // Tasks in queue for this building
+  const pendingForThisBuilding = tasks.filter(
+    t => t.targetId === building.id && (t.status === 'queued' || t.status === 'uploading' || t.status === 'processing')
+  );
+  const isBuildingUploading = pendingForThisBuilding.length > 0;
+
   if (!isOpen) return null;
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    try {
-      setIsUploading(true);
-      const newDocs: DocumentItem[] = [];
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        setUploadProgress(`Uploading ${i + 1}/${files.length}...`);
-        const res = await uploadImageFile(file, 'doc');
-        newDocs.push({
-          id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${i}`,
-          title: file.name.replace(/\.[^/.]+$/, ''),
-          description: '',
-          url: res.url,
-          uploadedAt: new Date().toISOString()
-        });
-      }
-      setFormData(prev => ({
-        ...prev,
-        documents: [...prev.documents, ...newDocs]
-      }));
-    } catch (err: any) {
-      console.error('File upload error:', err);
-      alert('Upload failed: ' + (err.message || 'Unknown error'));
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(null);
-      e.target.value = '';
-    }
+    enqueueUploads(files, {
+      target: 'doc',
+      targetId: building.id,
+      targetName: `[${formData.letter || building.letter}] ${formData.name || building.name}`
+    });
+
+    e.target.value = '';
   };
 
-  const handleFolderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFolderUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
@@ -107,41 +111,22 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
       return;
     }
 
-    try {
-      setIsUploading(true);
-      const newDocs: DocumentItem[] = [];
-      for (let i = 0; i < validFiles.length; i++) {
-        const file = validFiles[i];
-        setUploadProgress(`Uploading folder: ${i + 1}/${validFiles.length}...`);
-
-        let subfolder = '';
-        if (file.webkitRelativePath) {
-          const parts = file.webkitRelativePath.split('/');
-          parts.pop(); // Remove filename
-          subfolder = parts.join('/');
-        }
-
-        const res = await uploadImageFile(file, 'doc', subfolder);
-        newDocs.push({
-          id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${i}`,
-          title: file.name.replace(/\.[^/.]+$/, ''),
-          description: subfolder ? `Folder: ${subfolder}` : '',
-          url: res.url,
-          uploadedAt: new Date().toISOString()
-        });
+    validFiles.forEach(file => {
+      let subfolder = '';
+      if (file.webkitRelativePath) {
+        const parts = file.webkitRelativePath.split('/');
+        parts.pop();
+        subfolder = parts.join('/');
       }
-      setFormData(prev => ({
-        ...prev,
-        documents: [...prev.documents, ...newDocs]
-      }));
-    } catch (err: any) {
-      console.error('Folder upload error:', err);
-      alert('Folder upload failed: ' + (err.message || 'Unknown error'));
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(null);
-      e.target.value = '';
-    }
+      enqueueUploads([file], {
+        target: 'doc',
+        targetId: building.id,
+        targetName: `[${formData.letter || building.letter}] ${formData.name || building.name}`,
+        subfolder
+      });
+    });
+
+    e.target.value = '';
   };
 
   const handleAddLocalFile = (file: LocalFileItem) => {
@@ -323,6 +308,18 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
                   <span>Choose Folder File</span>
                 </button>
 
+                {isBuildingUploading && (
+                  <button
+                    type="button"
+                    onClick={openMenu}
+                    className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-blue-950/90 hover:bg-blue-900 text-blue-300 border border-blue-700/80 text-xs font-semibold shadow-sm transition animate-pulse"
+                    title="Click to view upload queue and details"
+                  >
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400 shrink-0" />
+                    <span>{pendingForThisBuilding.length} uploading • View Queue</span>
+                  </button>
+                )}
+
                 <label 
                   className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-600 cursor-pointer whitespace-nowrap shrink-0 transition shadow-sm"
                   title="Upload an entire folder of photos to /uploads"
@@ -336,7 +333,6 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
                     directory=""
                     multiple
                     onChange={handleFolderUpload}
-                    disabled={isUploading}
                     className="hidden"
                     hidden
                   />
@@ -347,13 +343,12 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
                   title="Upload one or multiple photos"
                 >
                   <Upload className="w-3.5 h-3.5 shrink-0" />
-                  <span>{uploadProgress || (isUploading ? 'Uploading...' : 'Upload Photos')}</span>
+                  <span>Upload Photos</span>
                   <input
                     type="file"
                     accept="image/*,.heic,.HEIC,.pdf"
                     multiple
                     onChange={handleFileUpload}
-                    disabled={isUploading}
                     className="hidden"
                     hidden
                   />

@@ -8,9 +8,11 @@ import { BuildingEditModal } from './components/BuildingEditModal';
 import { MapSettingsModal } from './components/MapSettingsModal';
 import { ImportExportModal } from './components/ImportExportModal';
 import { HelpModal } from './components/HelpModal';
+import { FloatingUploadPill } from './components/FloatingUploadPill';
+import { UploadProvider, useUploadQueue } from './context/UploadContext';
 import { Loader2 } from 'lucide-react';
 
-export const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [settings, setSettings] = useState<MapSettings | null>(null);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [mode, setMode] = useState<AppMode>('view');
@@ -38,6 +40,44 @@ export const App: React.FC = () => {
         setLoading(false);
       });
   }, []);
+
+  const { registerDocumentHandler } = useUploadQueue();
+
+  // Auto-persist documents when completed by global upload queue
+  useEffect(() => {
+    return registerDocumentHandler((buildingId, newDoc) => {
+      setBuildings(prev => {
+        const building = prev.find(b => b.id === buildingId);
+        if (!building) return prev;
+        if (building.documents.some(d => d.url === newDoc.url)) return prev;
+        const updatedBuilding: Building = {
+          ...building,
+          documents: [...building.documents, newDoc]
+        };
+        const updatedList = prev.map(b => (b.id === buildingId ? updatedBuilding : b));
+        saveBuildings(updatedList).catch(err => console.error('Failed to auto-persist uploaded document:', err));
+        return updatedList;
+      });
+
+      setEditingBuilding(prev => {
+        if (!prev || prev.id !== buildingId) return prev;
+        if (prev.documents.some(d => d.url === newDoc.url)) return prev;
+        return {
+          ...prev,
+          documents: [...prev.documents, newDoc]
+        };
+      });
+
+      setViewingBuilding(prev => {
+        if (!prev || prev.id !== buildingId) return prev;
+        if (prev.documents.some(d => d.url === newDoc.url)) return prev;
+        return {
+          ...prev,
+          documents: [...prev.documents, newDoc]
+        };
+      });
+    });
+  }, [registerDocumentHandler]);
 
   // Currently active map sheet
   const currentMap: MapPage | null = settings
@@ -248,6 +288,17 @@ export const App: React.FC = () => {
         buildings={buildings}
         onImportSuccess={handleImportSuccess}
       />
+
+      {/* Global Floating Upload Pill */}
+      <FloatingUploadPill />
     </div>
+  );
+};
+
+export const App: React.FC = () => {
+  return (
+    <UploadProvider>
+      <AppContent />
+    </UploadProvider>
   );
 };
