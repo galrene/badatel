@@ -56,6 +56,7 @@ export interface ImportPreview {
   documentCount: number;
   mediaFileCount: number;
   archiveSizeBytes: number;
+  token?: string;
 }
 
 export interface AppVersionInfo {

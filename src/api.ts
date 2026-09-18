@@ -91,24 +91,39 @@ export function downloadProjectZip(): void {
 }
 
 export async function inspectImportZip(file: File): Promise<ImportPreview> {
-  const base64 = await fileToBase64(file);
   const res = await fetch('/api/import/inspect', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ base64 })
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'X-File-Name': encodeURIComponent(file.name)
+    },
+    body: file
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to inspect backup archive');
-  return data.preview;
+  return { ...data.preview, token: data.token };
 }
 
-export async function executeImportZip(file: File, mode: 'replace' | 'merge'): Promise<{ settings: MapSettings; buildings: Building[] }> {
-  const base64 = await fileToBase64(file);
-  const res = await fetch('/api/import/execute', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ base64, mode })
-  });
+export async function executeImportZip(tokenOrFile: string | File, mode: 'replace' | 'merge'): Promise<{ settings: MapSettings; buildings: Building[] }> {
+  let res: Response;
+  if (typeof tokenOrFile === 'string') {
+    // Fast path: use already uploaded archive via server token (instant, no re-upload)
+    res = await fetch('/api/import/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: tokenOrFile, mode })
+    });
+  } else {
+    // Fallback: stream file directly
+    res = await fetch(`/api/import/execute?mode=${encodeURIComponent(mode)}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'X-File-Name': encodeURIComponent(tokenOrFile.name)
+      },
+      body: tokenOrFile
+    });
+  }
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to import backup archive');
   return { settings: data.settings, buildings: data.buildings };

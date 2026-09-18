@@ -16,13 +16,14 @@ const rootDir = path.resolve(__dirname, '..');
 
 const DATA_DIR = path.join(rootDir, 'data');
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+const TEMP_DIR = path.join(DATA_DIR, 'temp');
 const BUILDINGS_FILE = path.join(DATA_DIR, 'buildings.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const UPLOADS_DIR = path.join(rootDir, 'public', 'uploads');
 const SAMPLE_DIR = path.join(rootDir, 'public', 'sample-map');
 
 // Ensure directories exist
-for (const dir of [DATA_DIR, BACKUP_DIR, UPLOADS_DIR, SAMPLE_DIR]) {
+for (const dir of [DATA_DIR, BACKUP_DIR, TEMP_DIR, UPLOADS_DIR, SAMPLE_DIR]) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -347,6 +348,48 @@ function normalizeImportUrl(url) {
   return url;
 }
 
+function receiveStreamToFile(req) {
+  return new Promise((resolve, reject) => {
+    const tempName = `import_${Date.now()}_${Math.random().toString(36).slice(2)}.zip`;
+    const tempPath = path.join(TEMP_DIR, tempName);
+    const writeStream = fs.createWriteStream(tempPath);
+
+    const cleanup = () => {
+      try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch {}
+    };
+
+    if (typeof req.pipe === 'function') {
+      req.pipe(writeStream);
+      writeStream.on('finish', () => resolve({ tempName, tempPath }));
+      writeStream.on('error', (err) => { cleanup(); reject(err); });
+      req.on('error', (err) => { cleanup(); reject(err); });
+    } else {
+      req.on('data', chunk => writeStream.write(chunk));
+      req.on('end', () => {
+        writeStream.end(() => resolve({ tempName, tempPath }));
+      });
+      req.on('error', (err) => { cleanup(); reject(err); });
+    }
+  });
+}
+
+function cleanOldTempFiles() {
+  try {
+    if (!fs.existsSync(TEMP_DIR)) return;
+    const files = fs.readdirSync(TEMP_DIR);
+    const now = Date.now();
+    for (const f of files) {
+      const full = path.join(TEMP_DIR, f);
+      const stat = fs.statSync(full);
+      if (now - stat.mtimeMs > 3600 * 1000) {
+        try { fs.unlinkSync(full); } catch {}
+      }
+    }
+  } catch (e) {
+    // Ignore cleanup errors
+  }
+}
+
 // Helper to parse JSON body from Node request
 function parseJsonBody(req) {
   return new Promise((resolve, reject) => {
@@ -600,7 +643,7 @@ export function createApiMiddleware() {
         return res.end(JSON.stringify(info));
       }
 
-      // 7. GET /api/export
+      // 8. GET /api/export
       if (req.method === 'GET' && rawPathname === '/api/export') {
         const settings = readSettings();
         const buildings = readBuildings();
@@ -667,36 +710,76 @@ export function createApiMiddleware() {
           }
         }
 
-        const zipBuffer = zip.toBuffer();
+        const tempExportPath = path.join(TEMP_DIR, `export_${Date.now()}_${Math.random().toString(36).slice(2)}.zip`);
+        zip.writeZip(tempExportPath);
+
+        const stat = fs.statSync(tempExportPath);
         const dateStr = new Date().toISOString().slice(0, 10);
         res.setHeader('Content-Type', 'application/zip');
         res.setHeader('Content-Disposition', `attachment; filename="badatel-backup-${dateStr}.zip"`);
-        res.setHeader('Content-Length', zipBuffer.length);
+        res.setHeader('Content-Length', stat.size);
         res.statusCode = 200;
-        return res.end(zipBuffer);
+
+        if (typeof res.write === 'function' && typeof res.on === 'function') {
+          const stream = fs.createReadStream(tempExportPath);
+          stream.pipe(res);
+          stream.on('close', () => {
+            try { fs.unlinkSync(tempExportPath); } catch {}
+          });
+        } else {
+          const fileBuf = fs.readFileSync(tempExportPath);
+          try { fs.unlinkSync(tempExportPath); } catch {}
+          res.end(fileBuf);
+        }
+        return;
       }
 
-      // 8. POST /api/import/inspect
+      // 9. POST /api/import/inspect
       if (req.method === 'POST' && rawPathname === '/api/import/inspect') {
-        const body = await parseJsonBody(req);
-        const { base64 } = body;
-        if (!base64 || typeof base64 !== 'string') {
-          res.statusCode = 400;
-          return res.end(JSON.stringify({ error: 'base64 zip payload required' }));
+        cleanOldTempFiles();
+        const contentType = (req.headers['content-type'] || '').toLowerCase();
+        let zipPath = null;
+        let tempToken = null;
+
+        if (contentType.includes('application/json')) {
+          const body = await parseJsonBody(req);
+          const { base64, token } = body;
+          if (token) {
+            const safeToken = path.basename(token).replace(/[^a-zA-Z0-9._-]/g, '');
+            zipPath = path.join(TEMP_DIR, safeToken);
+            tempToken = safeToken;
+            if (!fs.existsSync(zipPath)) {
+              res.statusCode = 400;
+              return res.end(JSON.stringify({ error: 'Archive not found or expired' }));
+            }
+          } else if (base64 && typeof base64 === 'string') {
+            const base64Data = base64.replace(/^data:[^;]+;base64,/, '');
+            tempToken = `import_${Date.now()}_${Math.random().toString(36).slice(2)}.zip`;
+            zipPath = path.join(TEMP_DIR, tempToken);
+            fs.writeFileSync(zipPath, Buffer.from(base64Data, 'base64'));
+          } else {
+            res.statusCode = 400;
+            return res.end(JSON.stringify({ error: 'Archive stream, token, or base64 required' }));
+          }
+        } else {
+          // Direct binary stream (application/octet-stream, etc.)
+          const { tempName, tempPath } = await receiveStreamToFile(req);
+          zipPath = tempPath;
+          tempToken = tempName;
         }
 
-        const base64Data = base64.replace(/^data:[^;]+;base64,/, '');
-        const zipBuffer = Buffer.from(base64Data, 'base64');
         let zip;
         try {
-          zip = new AdmZip(zipBuffer);
+          zip = new AdmZip(zipPath);
         } catch (zipErr) {
+          try { fs.unlinkSync(zipPath); } catch {}
           res.statusCode = 400;
           return res.end(JSON.stringify({ error: 'Invalid ZIP archive file' }));
         }
 
         const manifestEntry = zip.getEntry('manifest.json');
         if (!manifestEntry) {
+          try { fs.unlinkSync(zipPath); } catch {}
           res.statusCode = 400;
           return res.end(JSON.stringify({ error: 'Invalid archive: missing manifest.json' }));
         }
@@ -705,11 +788,13 @@ export function createApiMiddleware() {
         try {
           manifest = JSON.parse(zip.readAsText(manifestEntry));
         } catch (err) {
+          try { fs.unlinkSync(zipPath); } catch {}
           res.statusCode = 400;
           return res.end(JSON.stringify({ error: 'Failed to parse manifest.json: corrupted data' }));
         }
 
         if (!manifest.settings || !Array.isArray(manifest.buildings)) {
+          try { fs.unlinkSync(zipPath); } catch {}
           res.statusCode = 400;
           return res.end(JSON.stringify({ error: 'Archive manifest is missing settings or buildings' }));
         }
@@ -722,6 +807,7 @@ export function createApiMiddleware() {
           }
         }
 
+        const fileSize = fs.existsSync(zipPath) ? fs.statSync(zipPath).size : 0;
         const preview = {
           title: manifest.settings?.title || 'Badatel Project',
           exportedAt: manifest.exportedAt || null,
@@ -729,34 +815,64 @@ export function createApiMiddleware() {
           buildingCount: manifest.buildings.length,
           documentCount: totalDocs,
           mediaFileCount: mediaEntries.length,
-          archiveSizeBytes: zipBuffer.length
+          archiveSizeBytes: fileSize
         };
 
         res.statusCode = 200;
-        return res.end(JSON.stringify({ success: true, preview }));
+        return res.end(JSON.stringify({ success: true, preview, token: tempToken }));
       }
 
-      // 9. POST /api/import/execute
+      // 10. POST /api/import/execute
       if (req.method === 'POST' && rawPathname === '/api/import/execute') {
-        const body = await parseJsonBody(req);
-        const { base64, mode = 'replace' } = body;
-        if (!base64 || typeof base64 !== 'string') {
-          res.statusCode = 400;
-          return res.end(JSON.stringify({ error: 'base64 zip payload required' }));
+        cleanOldTempFiles();
+        const contentType = (req.headers['content-type'] || '').toLowerCase();
+        let zipPath = null;
+        let mode = 'replace';
+        let shouldUnlinkZip = true;
+
+        if (contentType.includes('application/json')) {
+          const body = await parseJsonBody(req);
+          mode = body.mode || 'replace';
+          if (body.token) {
+            const safeToken = path.basename(body.token).replace(/[^a-zA-Z0-9._-]/g, '');
+            zipPath = path.join(TEMP_DIR, safeToken);
+            if (!fs.existsSync(zipPath)) {
+              res.statusCode = 400;
+              return res.end(JSON.stringify({ error: 'Import session expired or archive file not found. Please re-select your file.' }));
+            }
+          } else if (body.base64 && typeof body.base64 === 'string') {
+            const base64Data = body.base64.replace(/^data:[^;]+;base64,/, '');
+            const tempName = `import_${Date.now()}_${Math.random().toString(36).slice(2)}.zip`;
+            zipPath = path.join(TEMP_DIR, tempName);
+            fs.writeFileSync(zipPath, Buffer.from(base64Data, 'base64'));
+          } else {
+            res.statusCode = 400;
+            return res.end(JSON.stringify({ error: 'token, base64, or binary stream required' }));
+          }
+        } else {
+          // Direct binary stream
+          const urlObj = new URL(req.url, 'http://localhost');
+          mode = urlObj.searchParams.get('mode') || 'replace';
+          const { tempPath } = await receiveStreamToFile(req);
+          zipPath = tempPath;
         }
 
-        const base64Data = base64.replace(/^data:[^;]+;base64,/, '');
-        const zipBuffer = Buffer.from(base64Data, 'base64');
         let zip;
         try {
-          zip = new AdmZip(zipBuffer);
+          zip = new AdmZip(zipPath);
         } catch (zipErr) {
+          if (shouldUnlinkZip && fs.existsSync(zipPath)) {
+            try { fs.unlinkSync(zipPath); } catch {}
+          }
           res.statusCode = 400;
           return res.end(JSON.stringify({ error: 'Invalid ZIP archive file' }));
         }
 
         const manifestEntry = zip.getEntry('manifest.json');
         if (!manifestEntry) {
+          if (shouldUnlinkZip && fs.existsSync(zipPath)) {
+            try { fs.unlinkSync(zipPath); } catch {}
+          }
           res.statusCode = 400;
           return res.end(JSON.stringify({ error: 'Invalid archive: missing manifest.json' }));
         }
@@ -765,11 +881,17 @@ export function createApiMiddleware() {
         try {
           manifest = JSON.parse(zip.readAsText(manifestEntry));
         } catch (err) {
+          if (shouldUnlinkZip && fs.existsSync(zipPath)) {
+            try { fs.unlinkSync(zipPath); } catch {}
+          }
           res.statusCode = 400;
           return res.end(JSON.stringify({ error: 'Failed to parse manifest.json: corrupted data' }));
         }
 
         if (!manifest.settings || !Array.isArray(manifest.buildings)) {
+          if (shouldUnlinkZip && fs.existsSync(zipPath)) {
+            try { fs.unlinkSync(zipPath); } catch {}
+          }
           res.statusCode = 400;
           return res.end(JSON.stringify({ error: 'Archive manifest is missing settings or buildings' }));
         }
@@ -798,6 +920,11 @@ export function createApiMiddleware() {
             const targetPath = path.join(UPLOADS_DIR, safeName);
             fs.writeFileSync(targetPath, entry.getData());
           }
+        }
+
+        // Clean up temp archive file
+        if (shouldUnlinkZip && fs.existsSync(zipPath)) {
+          try { fs.unlinkSync(zipPath); } catch {}
         }
 
         let finalSettings;

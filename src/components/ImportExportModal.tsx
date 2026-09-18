@@ -102,7 +102,7 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({
     setImportError(null);
 
     try {
-      const res = await executeImportZip(selectedFile, importMode);
+      const res = await executeImportZip(preview.token || selectedFile, importMode);
       setImportSuccessMsg(
         importMode === 'replace'
           ? 'Project data restored successfully!'
