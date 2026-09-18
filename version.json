@@ -1,9 +1,9 @@
 {
   "version": "0.1.0",
-  "commitHash": "98508e73e824670974bc93a64f6b2d61c1d0923c",
-  "shortHash": "98508e7",
-  "commitMessage": "feat: add multi-photo upload, subfolder support, and non-root container security",
-  "commitDate": "2026-09-18T11:34:22+02:00",
-  "branch": "show_version_info",
-  "buildTime": "2026-09-18T18:50:26.889Z"
+  "commitHash": "dd1eead8d862e6d7169672ef0a90462cd0887973",
+  "shortHash": "dd1eead",
+  "commitMessage": "Merge branch 'main' into import_export_all_data",
+  "commitDate": "2026-09-18 20:51:03 +0200",
+  "branch": "main",
+  "buildTime": "2026-09-18T18:51:56.636Z"
 }
