@@ -1,9 +1,9 @@
 {
   "version": "0.1.0",
-  "commitHash": "dd1eead8d862e6d7169672ef0a90462cd0887973",
-  "shortHash": "dd1eead",
-  "commitMessage": "Merge branch 'main' into import_export_all_data",
-  "commitDate": "2026-09-18 20:51:03 +0200",
+  "commitHash": "76c6b727ef84c80ce524dcea57321333ecd2329a",
+  "shortHash": "76c6b72",
+  "commitMessage": "fix: resolve allocation size overflow during large archive imports by streaming binary data",
+  "commitDate": "2026-09-18 21:00:26 +0200",
   "branch": "main",
-  "buildTime": "2026-09-18T19:00:05.933Z"
+  "buildTime": "2026-09-18T19:00:41.714Z"
 }
