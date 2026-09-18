@@ -1,4 +1,4 @@
-import { Building, MapSettings, ImportPreview } from './types';
+import { Building, MapSettings, ImportPreview, LocalFilesResponse, AppVersionInfo } from './types';
 
 export async function fetchInitialData(): Promise<{ settings: MapSettings; buildings: Building[] }> {
   const res = await fetch('/api/data');
@@ -35,7 +35,11 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-export async function uploadImageFile(file: File, target: 'map' | 'doc' = 'doc'): Promise<{ url: string; filename: string; width?: number; height?: number }> {
+export async function uploadImageFile(
+  file: File,
+  target: 'map' | 'doc' = 'doc',
+  subfolder?: string
+): Promise<{ url: string; filename: string; width?: number; height?: number; subfolder?: string }> {
   const base64 = await fileToBase64(file);
 
   const res = await fetch('/api/upload', {
@@ -44,7 +48,8 @@ export async function uploadImageFile(file: File, target: 'map' | 'doc' = 'doc')
     body: JSON.stringify({
       filename: file.name,
       base64,
-      target
+      target,
+      subfolder
     })
   });
 
@@ -62,14 +67,17 @@ export async function rotateImage(url: string, degrees: number = 90, isMap: bool
   return res.json();
 }
 
-export async function fetchLocalFiles(): Promise<{ name: string; url: string; size: number }[]> {
+export async function fetchLocalFiles(): Promise<LocalFilesResponse> {
   try {
     const res = await fetch('/api/local-files');
-    if (!res.ok) return [];
+    if (!res.ok) return { files: [], folders: [] };
     const data = await res.json();
-    return data.files || [];
+    return {
+      files: data.files || [],
+      folders: data.folders || []
+    };
   } catch {
-    return [];
+    return { files: [], folders: [] };
   }
 }
 
@@ -104,4 +112,10 @@ export async function executeImportZip(file: File, mode: 'replace' | 'merge'): P
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to import backup archive');
   return { settings: data.settings, buildings: data.buildings };
+}
+
+export async function fetchVersionInfo(): Promise<AppVersionInfo> {
+  const res = await fetch('/api/version');
+  if (!res.ok) throw new Error('Failed to fetch version info');
+  return res.json();
 }

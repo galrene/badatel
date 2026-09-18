@@ -6,6 +6,19 @@ export interface DocumentItem {
   uploadedAt: string;
 }
 
+export interface LocalFileItem {
+  name: string;
+  path: string;
+  subfolder: string;
+  url: string;
+  size: number;
+}
+
+export interface LocalFilesResponse {
+  files: LocalFileItem[];
+  folders: string[];
+}
+
 export interface Building {
   id: string;
   mapId: string; // which map page this building is on
@@ -43,4 +56,24 @@ export interface ImportPreview {
   documentCount: number;
   mediaFileCount: number;
   archiveSizeBytes: number;
+}
+
+export interface AppVersionInfo {
+  version: string;
+  commitHash: string;
+  shortHash: string;
+  commitMessage: string;
+  commitDate: string;
+  branch?: string;
+  buildTime?: string;
+}
+
+// Vite compile-time injected constants
+declare global {
+  const __APP_VERSION__: string;
+  const __COMMIT_HASH__: string;
+  const __COMMIT_SHORT_HASH__: string;
+  const __COMMIT_MESSAGE__: string;
+  const __COMMIT_DATE__: string;
+  const __BUILD_TIME__: string;
 }

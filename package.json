@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "version:gen": "node server/generate-version.js",
+    "build": "node server/generate-version.js && tsc && vite build",
     "preview": "vite preview",
     "start": "node server.js",
     "convert-heic": "node server/convert-heic.js"

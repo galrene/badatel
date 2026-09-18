@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Building, DocumentItem } from '../types';
+import { Building, DocumentItem, LocalFileItem } from '../types';
 import { uploadImageFile, fetchLocalFiles, rotateImage } from '../api';
 import { 
   X, Trash2, Upload, Check, AlertTriangle, 
-  Image as ImageIcon, FolderOpen, RotateCw 
+  Image as ImageIcon, FolderOpen, RotateCw,
+  FolderPlus, Search, CheckSquare
 } from 'lucide-react';
 
 interface BuildingEditModalProps {
@@ -34,7 +35,11 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
 }) => {
   const [formData, setFormData] = useState<Building>({ ...building });
   const [isUploading, setIsUploading] = useState(false);
-  const [localFiles, setLocalFiles] = useState<{ name: string; url: string; size: number }[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  const [localFiles, setLocalFiles] = useState<LocalFileItem[]>([]);
+  const [localFolders, setLocalFolders] = useState<string[]>([]);
+  const [selectedSubfolder, setSelectedSubfolder] = useState<string>('__all__');
+  const [searchFilter, setSearchFilter] = useState<string>('');
   const [showLocalBrowser, setShowLocalBrowser] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -45,52 +50,127 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
 
   useEffect(() => {
     if (showLocalBrowser) {
-      fetchLocalFiles().then(setLocalFiles);
+      fetchLocalFiles().then(res => {
+        setLocalFiles(res.files);
+        setLocalFolders(res.folders);
+      });
     }
   }, [showLocalBrowser]);
 
   if (!isOpen) return null;
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
     try {
       setIsUploading(true);
-      const res = await uploadImageFile(file, 'doc');
-      const newDoc: DocumentItem = {
-        id: `doc-${Date.now()}`,
-        title: file.name.replace(/\.[^/.]+$/, ''),
-        description: '',
-        url: res.url,
-        uploadedAt: new Date().toISOString()
-      };
+      const newDocs: DocumentItem[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setUploadProgress(`Uploading ${i + 1}/${files.length}...`);
+        const res = await uploadImageFile(file, 'doc');
+        newDocs.push({
+          id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${i}`,
+          title: file.name.replace(/\.[^/.]+$/, ''),
+          description: '',
+          url: res.url,
+          uploadedAt: new Date().toISOString()
+        });
+      }
       setFormData(prev => ({
         ...prev,
-        documents: [...prev.documents, newDoc]
+        documents: [...prev.documents, ...newDocs]
       }));
     } catch (err: any) {
       console.error('File upload error:', err);
       alert('Upload failed: ' + (err.message || 'Unknown error'));
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
       e.target.value = '';
     }
   };
 
-  const handleAddLocalFile = (fileUrl: string, fileName: string) => {
+  const handleFolderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const validFiles = files.filter(f => {
+      const ext = f.name.toLowerCase().slice(f.name.lastIndexOf('.'));
+      return ['.jpg', '.jpeg', '.png', '.webp', '.svg', '.heic', '.pdf'].includes(ext);
+    });
+
+    if (validFiles.length === 0) {
+      alert('No supported photos or documents (.jpg, .png, .heic, .webp, .pdf) found in selected folder.');
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      const newDocs: DocumentItem[] = [];
+      for (let i = 0; i < validFiles.length; i++) {
+        const file = validFiles[i];
+        setUploadProgress(`Uploading folder: ${i + 1}/${validFiles.length}...`);
+
+        let subfolder = '';
+        if (file.webkitRelativePath) {
+          const parts = file.webkitRelativePath.split('/');
+          parts.pop(); // Remove filename
+          subfolder = parts.join('/');
+        }
+
+        const res = await uploadImageFile(file, 'doc', subfolder);
+        newDocs.push({
+          id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${i}`,
+          title: file.name.replace(/\.[^/.]+$/, ''),
+          description: subfolder ? `Folder: ${subfolder}` : '',
+          url: res.url,
+          uploadedAt: new Date().toISOString()
+        });
+      }
+      setFormData(prev => ({
+        ...prev,
+        documents: [...prev.documents, ...newDocs]
+      }));
+    } catch (err: any) {
+      console.error('Folder upload error:', err);
+      alert('Folder upload failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(null);
+      e.target.value = '';
+    }
+  };
+
+  const handleAddLocalFile = (file: LocalFileItem) => {
     const newDoc: DocumentItem = {
-      id: `doc-${Date.now()}`,
-      title: fileName.replace(/\.[^/.]+$/, ''),
-      description: '',
-      url: fileUrl,
+      id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      title: file.name.replace(/\.[^/.]+$/, ''),
+      description: file.subfolder ? `Folder: ${file.subfolder}` : '',
+      url: file.url,
       uploadedAt: new Date().toISOString()
     };
     setFormData(prev => ({
       ...prev,
       documents: [...prev.documents, newDoc]
     }));
-    setShowLocalBrowser(false);
+  };
+
+  const handleAddAllFiltered = (filesToAdd: LocalFileItem[]) => {
+    if (filesToAdd.length === 0) return;
+    const newDocs: DocumentItem[] = filesToAdd.map((file, idx) => ({
+      id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${idx}`,
+      title: file.name.replace(/\.[^/.]+$/, ''),
+      description: file.subfolder ? `Folder: ${file.subfolder}` : '',
+      url: file.url,
+      uploadedAt: new Date().toISOString()
+    }));
+    setFormData(prev => ({
+      ...prev,
+      documents: [...prev.documents, ...newDocs]
+    }));
   };
 
   const handleRemoveDoc = (docId: string) => {
@@ -223,30 +303,59 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
 
           {/* Attached Photographed Documentation */}
           <div className="pt-4 border-t-2 border-slate-800">
-            <div className="flex items-center justify-between mb-3">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+              <div className="min-w-0">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">Photographed Documentation</h3>
                 <p className="text-xs text-slate-400">Attach photos of blueprints, plans, permits, or inspections</p>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center flex-wrap gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setShowLocalBrowser(true)}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-600 transition"
-                  title="Pick a photo dropped into public/uploads"
+                  onClick={() => setShowLocalBrowser(prev => !prev)}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border whitespace-nowrap shrink-0 transition shadow-sm ${
+                    showLocalBrowser 
+                      ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' 
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-600'
+                  }`}
+                  title="Browse and pick photos organized in /uploads and its subfolders"
                 >
-                  <FolderOpen className="w-3.5 h-3.5 text-yellow-400" />
+                  <FolderOpen className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
                   <span>Choose Folder File</span>
                 </button>
-                <label className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer shadow-md transition">
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>{isUploading ? 'Uploading...' : 'Upload Photo'}</span>
+
+                <label 
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-600 cursor-pointer whitespace-nowrap shrink-0 transition shadow-sm"
+                  title="Upload an entire folder of photos to /uploads"
+                >
+                  <FolderPlus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Upload Folder</span>
+                  <input
+                    type="file"
+                    // @ts-expect-error webkitdirectory is supported by modern browsers
+                    webkitdirectory=""
+                    directory=""
+                    multiple
+                    onChange={handleFolderUpload}
+                    disabled={isUploading}
+                    className="hidden"
+                    hidden
+                  />
+                </label>
+
+                <label 
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold border border-blue-500 cursor-pointer whitespace-nowrap shrink-0 shadow-sm transition"
+                  title="Upload one or multiple photos"
+                >
+                  <Upload className="w-3.5 h-3.5 shrink-0" />
+                  <span>{uploadProgress || (isUploading ? 'Uploading...' : 'Upload Photos')}</span>
                   <input
                     type="file"
                     accept="image/*,.heic,.HEIC,.pdf"
+                    multiple
                     onChange={handleFileUpload}
                     disabled={isUploading}
                     className="hidden"
+                    hidden
                   />
                 </label>
               </div>
@@ -254,29 +363,134 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
 
             {/* Local file picker popup if opened */}
             {showLocalBrowser && (
-              <div className="mb-4 p-3 bg-slate-950 border-2 border-slate-700 rounded-xl shadow-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-slate-200">Files available in /public/uploads:</span>
-                  <button onClick={() => setShowLocalBrowser(false)} className="text-slate-400 hover:text-white text-xs font-semibold">
+              <div className="mb-4 p-3 bg-slate-950 border-2 border-slate-700 rounded-xl shadow-xl space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-bold text-slate-200 flex items-center">
+                      <FolderOpen className="w-4 h-4 text-yellow-400 mr-1.5" />
+                      Files in /public/uploads ({localFiles.length} found)
+                    </span>
+                  </div>
+                  <button 
+                    onClick={() => setShowLocalBrowser(false)} 
+                    className="text-slate-400 hover:text-white text-xs font-semibold px-2 py-0.5 rounded hover:bg-slate-800 transition"
+                  >
                     Close
                   </button>
                 </div>
-                {localFiles.length === 0 ? (
-                  <p className="text-xs text-slate-500 py-2">No files in public/uploads/ yet. Drop images there or use Upload Photo.</p>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
-                    {localFiles.map(f => (
-                      <button
-                        key={f.url}
-                        type="button"
-                        onClick={() => handleAddLocalFile(f.url, f.name)}
-                        className="flex items-center space-x-2 p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left text-xs text-slate-200 hover:text-white transition"
-                      >
-                        <ImageIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                        <span className="truncate">{f.name}</span>
-                      </button>
-                    ))}
+
+                {/* Subfolder and Search Filters */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex-1 min-w-[140px]">
+                    <select
+                      value={selectedSubfolder}
+                      onChange={e => setSelectedSubfolder(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500 font-medium"
+                    >
+                      <option value="__all__">📁 All Folders ({localFiles.length} files)</option>
+                      <option value="__root__">📁 / (Root uploads)</option>
+                      {localFolders.map(f => (
+                        <option key={f} value={f}>📂 {f}</option>
+                      ))}
+                    </select>
                   </div>
+
+                  <div className="relative flex-1 min-w-[140px]">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={searchFilter}
+                      onChange={e => setSearchFilter(e.target.value)}
+                      placeholder="Search photos..."
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  {(() => {
+                    const filtered = localFiles.filter(f => {
+                      const matchesSubfolder = 
+                        selectedSubfolder === '__all__' ? true :
+                        selectedSubfolder === '__root__' ? !f.subfolder :
+                        f.subfolder === selectedSubfolder || f.subfolder.startsWith(selectedSubfolder + '/');
+                      const matchesSearch = !searchFilter.trim() ? true :
+                        f.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
+                        f.subfolder.toLowerCase().includes(searchFilter.toLowerCase());
+                      return matchesSubfolder && matchesSearch;
+                    });
+
+                    if (filtered.length > 0) {
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => handleAddAllFiltered(filtered)}
+                          className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow shrink-0"
+                          title="Attach all matching photos to this building"
+                        >
+                          <CheckSquare className="w-3.5 h-3.5" />
+                          <span>Add All ({filtered.length})</span>
+                        </button>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+
+                {localFiles.length === 0 ? (
+                  <p className="text-xs text-slate-500 py-3 text-center">
+                    No files found in public/uploads/ or its subfolders. Drop files/folders there or use Upload Photos / Upload Folder.
+                  </p>
+                ) : (
+                  (() => {
+                    const filtered = localFiles.filter(f => {
+                      const matchesSubfolder = 
+                        selectedSubfolder === '__all__' ? true :
+                        selectedSubfolder === '__root__' ? !f.subfolder :
+                        f.subfolder === selectedSubfolder || f.subfolder.startsWith(selectedSubfolder + '/');
+                      const matchesSearch = !searchFilter.trim() ? true :
+                        f.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
+                        f.subfolder.toLowerCase().includes(searchFilter.toLowerCase());
+                      return matchesSubfolder && matchesSearch;
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <p className="text-xs text-slate-400 py-3 text-center">
+                          No files match current folder or search filter.
+                        </p>
+                      );
+                    }
+
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
+                        {filtered.map(f => (
+                          <button
+                            key={f.url}
+                            type="button"
+                            onClick={() => handleAddLocalFile(f)}
+                            className="flex items-center space-x-2.5 p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-blue-500/50 text-left text-xs text-slate-200 hover:text-white transition group"
+                            title={`Click to add: ${f.path || f.name}`}
+                          >
+                            <ImageIcon className="w-4 h-4 text-blue-400 shrink-0 group-hover:scale-110 transition-transform" />
+                            <div className="flex-1 min-w-0">
+                              <div className="truncate font-medium">{f.name}</div>
+                              {f.subfolder ? (
+                                <div className="text-[10px] text-amber-400 font-mono truncate mt-0.5">
+                                  📁 {f.subfolder}
+                                </div>
+                              ) : (
+                                <div className="text-[10px] text-slate-500 font-mono truncate mt-0.5">
+                                  📁 / (root)
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-mono shrink-0">
+                              {f.size ? `${Math.round(f.size / 1024)} KB` : ''}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()
                 )}
               </div>
             )}
@@ -294,7 +508,7 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
                     <img 
                       src={doc.url} 
                       alt={doc.title} 
-                      className="w-18 h-18 rounded-lg object-cover bg-slate-950 border-2 border-slate-600 shrink-0 shadow"
+                      className="w-16 h-16 rounded-lg object-cover bg-slate-950 border-2 border-slate-600 shrink-0 shadow"
                     />
                     <div className="flex-1 space-y-2">
                       <input

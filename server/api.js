@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import sharp from 'sharp';
 import heicConvert from 'heic-convert';
 import AdmZip from 'adm-zip';
+import { getVersionInfo } from './version-helper.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -93,6 +94,64 @@ async function autoOrientImage(filePath) {
   } catch (err) {
     console.warn('Auto-orient error (continuing):', err.message);
   }
+}
+
+/**
+ * Recursively scans directory for documents/images and discovers subfolders
+ */
+async function scanUploadsDirectory(baseDir, relativeFolder = '') {
+  const currentDir = relativeFolder ? path.join(baseDir, relativeFolder) : baseDir;
+  if (!fs.existsSync(currentDir)) return { files: [], folders: [] };
+
+  const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+  let files = [];
+  let folders = [];
+
+  for (const entry of entries) {
+    if (entry.name.startsWith('.')) continue; // ignore hidden files/directories (.gitkeep, .DS_Store)
+    const entryRelativePath = relativeFolder ? `${relativeFolder.replace(/\\/g, '/')}/${entry.name}` : entry.name;
+    const fullPath = path.join(currentDir, entry.name);
+
+    if (entry.isDirectory()) {
+      folders.push(entryRelativePath);
+      const sub = await scanUploadsDirectory(baseDir, entryRelativePath);
+      files = files.concat(sub.files);
+      folders = folders.concat(sub.folders);
+    } else if (entry.isFile()) {
+      let finalFullPath = fullPath;
+      let finalName = entry.name;
+      let finalRelativePath = entryRelativePath;
+
+      if (entry.name.toLowerCase().endsWith('.heic')) {
+        const converted = await convertHeicToJpg(fullPath);
+        if (converted !== fullPath && fs.existsSync(fullPath)) {
+          try { fs.unlinkSync(fullPath); } catch {}
+        }
+        finalFullPath = converted;
+        finalName = path.basename(converted);
+        finalRelativePath = relativeFolder ? `${relativeFolder.replace(/\\/g, '/')}/${finalName}` : finalName;
+      }
+
+      const ext = path.extname(finalName).toLowerCase();
+      const validExts = ['.jpg', '.jpeg', '.png', '.webp', '.svg', '.pdf', '.gif'];
+      if (validExts.includes(ext)) {
+        const stat = fs.existsSync(finalFullPath) ? fs.statSync(finalFullPath) : null;
+        const normalizedSubfolder = relativeFolder ? relativeFolder.replace(/\\/g, '/') : '';
+        const urlSegments = finalRelativePath.split('/').map(seg => encodeURIComponent(seg)).join('/');
+        files.push({
+          name: finalName,
+          path: finalRelativePath,
+          subfolder: normalizedSubfolder,
+          url: `/uploads/${urlSegments}`,
+          size: stat ? stat.size : 0
+        });
+      }
+    }
+  }
+
+  // Deduplicate and sort folders
+  const uniqueFolders = Array.from(new Set(folders)).sort();
+  return { files, folders: uniqueFolders };
 }
 
 // Initial default settings
@@ -371,18 +430,37 @@ export function createApiMiddleware() {
       }
 
       // 4. POST /api/upload
-      // Accepts { filename: string, base64: string, target?: 'map' | 'doc' }
+      // Accepts { filename: string, base64: string, target?: 'map' | 'doc', subfolder?: string }
       if (req.method === 'POST' && rawPathname === '/api/upload') {
         const body = await parseJsonBody(req);
-        const { filename, base64, target } = body;
+        const { filename, base64, target, subfolder } = body;
         if (!filename || !base64 || typeof filename !== 'string' || typeof base64 !== 'string') {
           res.statusCode = 400;
           return res.end(JSON.stringify({ error: 'filename and base64 required' }));
         }
 
+        // Sanitize subfolder to prevent directory traversal
+        let safeSubfolder = '';
+        if (subfolder && typeof subfolder === 'string') {
+          const cleanSub = path.normalize(subfolder).replace(/^(\.\.[\/\\])+/, '').trim();
+          const segments = cleanSub.split(/[/\\]/).filter(s => s && s !== '.' && s !== '..');
+          safeSubfolder = segments.map(s => s.replace(/[^a-zA-Z0-9._ -]/g, '_')).join('/');
+        }
+
         const safeBase = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
         const cleanName = `${Date.now()}_${safeBase}`;
-        const targetDir = target === 'map' ? path.join(rootDir, 'public', 'uploads') : UPLOADS_DIR;
+        
+        let targetDir = UPLOADS_DIR;
+        if (target === 'map') {
+          targetDir = path.join(rootDir, 'public', 'uploads');
+        } else if (safeSubfolder) {
+          targetDir = path.join(UPLOADS_DIR, safeSubfolder);
+        }
+
+        if (!fs.existsSync(targetDir)) {
+          fs.mkdirSync(targetDir, { recursive: true });
+        }
+
         const filePath = path.join(targetDir, cleanName);
 
         // Strip data:image/...;base64, prefix if present
@@ -415,12 +493,17 @@ export function createApiMiddleware() {
           console.warn('Could not read image dimensions:', metaErr.message);
         }
 
-        const publicUrl = `/uploads/${finalName}`;
+        const relativeUrlPath = safeSubfolder 
+          ? `${safeSubfolder.split('/').map(s => encodeURIComponent(s)).join('/')}/${encodeURIComponent(finalName)}`
+          : encodeURIComponent(finalName);
+        const publicUrl = `/uploads/${relativeUrlPath}`;
+
         res.statusCode = 200;
         return res.end(JSON.stringify({
           success: true,
           url: publicUrl,
           filename: finalName,
+          subfolder: safeSubfolder,
           width,
           height
         }));
@@ -444,8 +527,12 @@ export function createApiMiddleware() {
           return res.end(JSON.stringify({ error: 'degrees must be one of: 90, 180, 270, -90, -180, -270' }));
         }
 
-        // Sanitize path against directory traversal
-        const cleanUrl = imageUrl.split('?')[0].replace(/^(\.\.[\/\\])+/, '');
+        // Sanitize path against directory traversal and decode URI components
+        let cleanUrl = imageUrl.split('?')[0];
+        try {
+          cleanUrl = decodeURIComponent(cleanUrl);
+        } catch {}
+        cleanUrl = cleanUrl.replace(/^(\.\.[\/\\])+/, '');
         const relative = path.normalize(cleanUrl).replace(/^[\/\\]+/, '');
         const publicBase = path.join(rootDir, 'public');
         const filePath = path.resolve(publicBase, relative);
@@ -500,31 +587,17 @@ export function createApiMiddleware() {
 
       // 6. GET /api/local-files
       if (req.method === 'GET' && rawPathname === '/api/local-files') {
-        const rawFiles = fs.readdirSync(UPLOADS_DIR).filter(f => !f.startsWith('.'));
-        
-        for (const f of rawFiles) {
-          if (f.toLowerCase().endsWith('.heic')) {
-            const sourcePath = path.join(UPLOADS_DIR, f);
-            const converted = await convertHeicToJpg(sourcePath);
-            // Remove source HEIC to avoid repeated conversion loops
-            if (converted !== sourcePath && fs.existsSync(sourcePath)) {
-              try { fs.unlinkSync(sourcePath); } catch {}
-            }
-          }
-        }
-
-        const files = fs.readdirSync(UPLOADS_DIR)
-          .filter(f => !f.startsWith('.') && !f.toLowerCase().endsWith('.heic'))
-          .map(f => {
-            const full = path.join(UPLOADS_DIR, f);
-            return {
-              name: f,
-              url: `/uploads/${f}`,
-              size: fs.existsSync(full) ? fs.statSync(full).size : 0
-            };
-          });
+        const { files, folders } = await scanUploadsDirectory(UPLOADS_DIR);
         res.statusCode = 200;
-        return res.end(JSON.stringify({ files }));
+        return res.end(JSON.stringify({ files, folders }));
+      }
+
+      // 7. GET /api/version
+      if (req.method === 'GET' && rawPathname === '/api/version') {
+        const info = getVersionInfo();
+        res.setHeader('Content-Type', 'application/json');
+        res.statusCode = 200;
+        return res.end(JSON.stringify(info));
       }
 
       // 7. GET /api/export
