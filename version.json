@@ -1,9 +1,9 @@
 {
   "version": "0.1.0",
-  "commitHash": "76c6b727ef84c80ce524dcea57321333ecd2329a",
-  "shortHash": "76c6b72",
-  "commitMessage": "fix: resolve allocation size overflow during large archive imports by streaming binary data",
-  "commitDate": "2026-09-18 21:00:26 +0200",
-  "branch": "main",
-  "buildTime": "2026-09-18T19:21:33.042Z"
+  "commitHash": "b631dcadb45cb3b4fa180539ff6bd8f6a65d68db",
+  "shortHash": "b631dca",
+  "commitMessage": "feat: add global upload queue and status menu with background persistence",
+  "commitDate": "2026-09-18 21:23:17 +0200",
+  "branch": "global_upload_status_menu",
+  "buildTime": "2026-09-18T19:43:15.709Z"
 }

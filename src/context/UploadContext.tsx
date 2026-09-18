@@ -58,16 +58,25 @@ const UploadContext = createContext<UploadContextType | null>(null);
 
 const MAX_CONCURRENT = 2;
 
-export const UploadProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export interface UploadProviderProps {
+  children: React.ReactNode;
+  onDocumentCompleted?: (buildingId: string, doc: DocumentItem) => void;
+}
+
+export const UploadProvider: React.FC<UploadProviderProps> = ({ children, onDocumentCompleted }) => {
   const [tasks, setTasks] = useState<UploadTask[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // Active abort controllers
+  // Active abort controllers & throttle tracking
   const activeControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const lastProgressUpdateRef = useRef<Map<string, number>>(new Map());
   const tasksRef = useRef<UploadTask[]>([]);
   tasksRef.current = tasks;
 
-  // Registered document completion handlers (e.g. App.tsx building auto-persist)
+  const onDocumentCompletedRef = useRef(onDocumentCompleted);
+  onDocumentCompletedRef.current = onDocumentCompleted;
+
+  // Registered document completion handlers
   const docHandlersRef = useRef<Set<(buildingId: string, doc: DocumentItem) => void>>(new Set());
 
   const registerDocumentHandler = useCallback((handler: (buildingId: string, doc: DocumentItem) => void) => {
@@ -128,6 +137,9 @@ export const UploadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         signal: abortController.signal,
         onProgress: (info) => {
           const now = Date.now();
+          const lastUpdate = lastProgressUpdateRef.current.get(taskId) || 0;
+          const shouldUpdateState = now - lastUpdate >= 100 || info.percent === 100;
+
           const timeDelta = (now - lastTime) / 1000;
           let speed = 0;
           if (timeDelta > 0.4) {
@@ -137,14 +149,16 @@ export const UploadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             lastTime = now;
           }
 
-          const currentFileBytes = Math.min(task.file.size, Math.round((info.loaded / info.total) * task.file.size));
-
-          updateTask(taskId, {
-            progress: info.percent,
-            loadedBytes: currentFileBytes,
-            totalBytes: task.file.size,
-            ...(speed > 0 ? { speedBytesPerSec: speed } : {})
-          });
+          if (shouldUpdateState) {
+            lastProgressUpdateRef.current.set(taskId, now);
+            const currentFileBytes = Math.min(task.file.size, Math.round((info.loaded / info.total) * task.file.size));
+            updateTask(taskId, {
+              progress: info.percent,
+              loadedBytes: currentFileBytes,
+              totalBytes: task.file.size,
+              ...(speed > 0 ? { speedBytesPerSec: speed } : {})
+            });
+          }
         },
         onProcessing: () => {
           updateTask(taskId, {
@@ -156,6 +170,7 @@ export const UploadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       activeControllersRef.current.delete(taskId);
+      lastProgressUpdateRef.current.delete(taskId);
 
       const completedAt = Date.now();
       updateTask(taskId, {
@@ -178,6 +193,14 @@ export const UploadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           url: res.url,
           uploadedAt: new Date().toISOString()
         };
+
+        if (onDocumentCompletedRef.current) {
+          try {
+            onDocumentCompletedRef.current(task.targetId, newDoc);
+          } catch (err) {
+            console.error('Error in onDocumentCompleted callback:', err);
+          }
+        }
 
         docHandlersRef.current.forEach(handler => {
           try {
@@ -291,30 +314,53 @@ export const UploadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const openMenu = useCallback(() => setIsMenuOpen(true), []);
   const closeMenu = useCallback(() => setIsMenuOpen(false), []);
 
+  const contextValue = React.useMemo<UploadContextType>(
+    () => ({
+      tasks,
+      activeCount,
+      queuedCount,
+      completedCount,
+      errorCount,
+      isUploading,
+      overallProgress,
+      overallSpeed,
+      isMenuOpen,
+      setIsMenuOpen,
+      openMenu,
+      closeMenu,
+      enqueueUploads,
+      cancelUpload,
+      cancelAll,
+      retryUpload,
+      clearCompleted,
+      clearAll,
+      registerDocumentHandler
+    }),
+    [
+      tasks,
+      activeCount,
+      queuedCount,
+      completedCount,
+      errorCount,
+      isUploading,
+      overallProgress,
+      overallSpeed,
+      isMenuOpen,
+      setIsMenuOpen,
+      openMenu,
+      closeMenu,
+      enqueueUploads,
+      cancelUpload,
+      cancelAll,
+      retryUpload,
+      clearCompleted,
+      clearAll,
+      registerDocumentHandler
+    ]
+  );
+
   return (
-    <UploadContext.Provider
-      value={{
-        tasks,
-        activeCount,
-        queuedCount,
-        completedCount,
-        errorCount,
-        isUploading,
-        overallProgress,
-        overallSpeed,
-        isMenuOpen,
-        setIsMenuOpen,
-        openMenu,
-        closeMenu,
-        enqueueUploads,
-        cancelUpload,
-        cancelAll,
-        retryUpload,
-        clearCompleted,
-        clearAll,
-        registerDocumentHandler
-      }}
-    >
+    <UploadContext.Provider value={contextValue}>
       {children}
     </UploadContext.Provider>
   );
