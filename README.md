@@ -50,6 +50,6 @@ npm test
 
 ---
 
-## Notice
 
-> **Note**: This project is 100% vibecoded and just a pastime project to help my girlfriend with her thesis. It is not a serious software and should not be treated as such.
+> [!WARNING]
+> This project is 100% vibecoded and just a pastime project to help my girlfriend with her thesis. It is not serious software and should not be treated as such.
