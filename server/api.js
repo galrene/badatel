@@ -15,21 +15,25 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
-const DATA_DIR = path.join(rootDir, 'data');
-const BACKUP_DIR = path.join(DATA_DIR, 'backups');
-const TEMP_DIR = path.join(DATA_DIR, 'temp');
-const BUILDINGS_FILE = path.join(DATA_DIR, 'buildings.json');
-const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
-const UPLOADS_DIR = path.join(rootDir, 'public', 'uploads');
-const SAMPLE_DIR = path.join(rootDir, 'public', 'sample-map');
-const FILE_HASHES_FILE = path.join(DATA_DIR, '.file_hashes.json');
+export const getDataDir = () => process.env.DATA_DIR || path.join(rootDir, 'data');
+export const getBackupDir = () => process.env.BACKUP_DIR || path.join(getDataDir(), 'backups');
+export const getTempDir = () => process.env.TEMP_DIR || path.join(getDataDir(), 'temp');
+export const getBuildingsFile = () => path.join(getDataDir(), 'buildings.json');
+export const getSettingsFile = () => path.join(getDataDir(), 'settings.json');
+export const getPublicDir = () => process.env.PUBLIC_DIR || path.join(rootDir, 'public');
+export const getUploadsDir = () => process.env.UPLOADS_DIR || path.join(getPublicDir(), 'uploads');
+export const getSampleDir = () => process.env.SAMPLE_DIR || path.join(getPublicDir(), 'sample-map');
+export const getFileHashesFile = () => path.join(getDataDir(), '.file_hashes.json');
 
 // Ensure directories exist
-for (const dir of [DATA_DIR, BACKUP_DIR, TEMP_DIR, UPLOADS_DIR, SAMPLE_DIR]) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+export function ensureDirsExist() {
+  for (const dir of [getDataDir(), getBackupDir(), getTempDir(), getUploadsDir(), getSampleDir()]) {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
   }
 }
+ensureDirsExist();
 
 // In-memory hash index
 // hashIndex: sha256 -> Array<{ fullPath, relPath, filename, subfolder, url, size, mtimeMs, width, height }>
@@ -37,6 +41,12 @@ for (const dir of [DATA_DIR, BACKUP_DIR, TEMP_DIR, UPLOADS_DIR, SAMPLE_DIR]) {
 let hashIndexLoaded = false;
 const hashIndex = new Map();
 const fileIndex = new Map();
+
+export function resetHashIndexForTesting() {
+  hashIndexLoaded = false;
+  hashIndex.clear();
+  fileIndex.clear();
+}
 
 function computeBufferHash(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
@@ -51,8 +61,8 @@ function loadHashIndexFromDisk() {
   if (hashIndexLoaded) return;
   hashIndexLoaded = true;
   try {
-    if (fs.existsSync(FILE_HASHES_FILE)) {
-      const data = JSON.parse(fs.readFileSync(FILE_HASHES_FILE, 'utf8'));
+    if (fs.existsSync(getFileHashesFile())) {
+      const data = JSON.parse(fs.readFileSync(getFileHashesFile(), 'utf8'));
       for (const [hash, entries] of Object.entries(data)) {
         if (Array.isArray(entries)) {
           hashIndex.set(hash, entries);
@@ -75,7 +85,7 @@ function saveHashIndexToDisk() {
     for (const [hash, entries] of hashIndex.entries()) {
       obj[hash] = entries;
     }
-    fs.writeFileSync(FILE_HASHES_FILE, JSON.stringify(obj, null, 2), 'utf8');
+    fs.writeFileSync(getFileHashesFile(), JSON.stringify(obj, null, 2), 'utf8');
   } catch (err) {
     console.warn('Failed to save .file_hashes.json:', err.message);
   }
@@ -120,7 +130,7 @@ async function syncHashIndexWithDisk() {
       }
     }
   }
-  walkDir(UPLOADS_DIR);
+  walkDir(getUploadsDir());
 
   let changed = false;
 
@@ -216,7 +226,7 @@ function updateFileEntryHash(fullPath, newBuffer, width = null, height = null) {
     }
 
     fileIndex.set(fullPath, { hash: newHash, size: stat.size, mtimeMs: stat.mtimeMs });
-    const rel = path.relative(UPLOADS_DIR, fullPath).replace(/\\/g, '/');
+    const rel = path.relative(getUploadsDir(), fullPath).replace(/\\/g, '/');
     const subfolder = path.dirname(rel) === '.' ? '' : path.dirname(rel);
     const urlSegments = rel.split('/').map(s => encodeURIComponent(s)).join('/');
     const entry = {
@@ -284,7 +294,7 @@ async function getOrLinkFileForSubfolder({ hash, targetSubfolder = '', preferred
   }
 
   // Link into normalizedSubfolder
-  const targetDir = normalizedSubfolder ? path.join(UPLOADS_DIR, normalizedSubfolder) : UPLOADS_DIR;
+  const targetDir = normalizedSubfolder ? path.join(getUploadsDir(), normalizedSubfolder) : getUploadsDir();
   if (!fs.existsSync(targetDir)) {
     fs.mkdirSync(targetDir, { recursive: true });
   }
@@ -600,8 +610,8 @@ const defaultBuildings = [
 
 function readSettings() {
   try {
-    if (fs.existsSync(SETTINGS_FILE)) {
-      const parsed = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+    if (fs.existsSync(getSettingsFile())) {
+      const parsed = JSON.parse(fs.readFileSync(getSettingsFile(), 'utf8'));
       // Migrate legacy format if needed
       if (!parsed.maps && parsed.mapImage) {
         return {
@@ -633,13 +643,13 @@ function writeAtomicJson(filePath, data) {
 }
 
 function writeSettings(settings) {
-  writeAtomicJson(SETTINGS_FILE, settings);
+  writeAtomicJson(getSettingsFile(), settings);
 }
 
 function readBuildings() {
   try {
-    if (fs.existsSync(BUILDINGS_FILE)) {
-      return JSON.parse(fs.readFileSync(BUILDINGS_FILE, 'utf8'));
+    if (fs.existsSync(getBuildingsFile())) {
+      return JSON.parse(fs.readFileSync(getBuildingsFile(), 'utf8'));
     }
   } catch (err) {
     console.error('Error reading buildings:', err);
@@ -648,7 +658,7 @@ function readBuildings() {
 }
 
 function writeBuildings(buildings) {
-  writeAtomicJson(BUILDINGS_FILE, buildings);
+  writeAtomicJson(getBuildingsFile(), buildings);
 }
 
 function resolveDiskPath(urlPath) {
@@ -656,7 +666,7 @@ function resolveDiskPath(urlPath) {
   const cleanUrl = urlPath.split('?')[0];
   const normalized = path.normalize(cleanUrl).replace(/^(\.\.[\/\\])+/, '');
   const relative = normalized.replace(/^[\/\\]+/, '');
-  const publicBase = path.resolve(rootDir, 'public');
+  const publicBase = path.resolve(getPublicDir());
   const candidate = path.resolve(publicBase, relative);
   if (candidate.startsWith(publicBase) && fs.existsSync(candidate)) {
     return candidate;
@@ -676,7 +686,7 @@ function normalizeImportUrl(url) {
 function receiveStreamToFile(req) {
   return new Promise((resolve, reject) => {
     const tempName = `import_${Date.now()}_${Math.random().toString(36).slice(2)}.zip`;
-    const tempPath = path.join(TEMP_DIR, tempName);
+    const tempPath = path.join(getTempDir(), tempName);
     const writeStream = fs.createWriteStream(tempPath);
 
     const cleanup = () => {
@@ -685,14 +695,15 @@ function receiveStreamToFile(req) {
 
     if (typeof req.pipe === 'function') {
       req.pipe(writeStream);
-      writeStream.on('finish', () => resolve({ tempName, tempPath }));
+      writeStream.on('close', () => resolve({ tempName, tempPath }));
       writeStream.on('error', (err) => { cleanup(); reject(err); });
       req.on('error', (err) => { cleanup(); reject(err); });
     } else {
       req.on('data', chunk => writeStream.write(chunk));
       req.on('end', () => {
-        writeStream.end(() => resolve({ tempName, tempPath }));
+        writeStream.end();
       });
+      writeStream.on('close', () => resolve({ tempName, tempPath }));
       req.on('error', (err) => { cleanup(); reject(err); });
     }
   });
@@ -700,11 +711,11 @@ function receiveStreamToFile(req) {
 
 function cleanOldTempFiles() {
   try {
-    if (!fs.existsSync(TEMP_DIR)) return;
-    const files = fs.readdirSync(TEMP_DIR);
+    if (!fs.existsSync(getTempDir())) return;
+    const files = fs.readdirSync(getTempDir());
     const now = Date.now();
     for (const f of files) {
-      const full = path.join(TEMP_DIR, f);
+      const full = path.join(getTempDir(), f);
       const stat = fs.statSync(full);
       if (now - stat.mtimeMs > 3600 * 1000) {
         try { fs.unlinkSync(full); } catch {}
@@ -742,10 +753,11 @@ function parseJsonBody(req) {
 }
 
 export function createApiMiddleware() {
-  if (!fs.existsSync(SETTINGS_FILE)) {
+  ensureDirsExist();
+  if (!fs.existsSync(getSettingsFile())) {
     writeSettings(defaultSettings);
   }
-  if (!fs.existsSync(BUILDINGS_FILE)) {
+  if (!fs.existsSync(getBuildingsFile())) {
     writeBuildings(defaultBuildings);
   }
 
@@ -902,11 +914,11 @@ export function createApiMiddleware() {
 
         const cleanName = `${Date.now()}_${safeBase}`;
         
-        let targetDir = UPLOADS_DIR;
+        let targetDir = getUploadsDir();
         if (target === 'map') {
-          targetDir = path.join(rootDir, 'public', 'uploads');
+          targetDir = getUploadsDir();
         } else if (safeSubfolder) {
-          targetDir = path.join(UPLOADS_DIR, safeSubfolder);
+          targetDir = path.join(getUploadsDir(), safeSubfolder);
         }
 
         if (!fs.existsSync(targetDir)) {
@@ -1049,7 +1061,7 @@ export function createApiMiddleware() {
         } catch {}
         cleanUrl = cleanUrl.replace(/^(\.\.[\/\\])+/, '');
         const relative = path.normalize(cleanUrl).replace(/^[\/\\]+/, '');
-        const publicBase = path.join(rootDir, 'public');
+        const publicBase = path.resolve(getPublicDir());
         const filePath = path.resolve(publicBase, relative);
 
         // Enforce boundary strictly within public/
@@ -1106,7 +1118,7 @@ export function createApiMiddleware() {
       // 6. GET /api/local-files
       if (req.method === 'GET' && rawPathname === '/api/local-files') {
         await syncHashIndexWithDisk();
-        const { files, folders } = await scanUploadsDirectory(UPLOADS_DIR);
+        const { files, folders } = await scanUploadsDirectory(getUploadsDir());
         res.statusCode = 200;
         return res.end(JSON.stringify({ files, folders }));
       }
@@ -1186,28 +1198,13 @@ export function createApiMiddleware() {
           }
         }
 
-        const tempExportPath = path.join(TEMP_DIR, `export_${Date.now()}_${Math.random().toString(36).slice(2)}.zip`);
-        zip.writeZip(tempExportPath);
-
-        const stat = fs.statSync(tempExportPath);
+        const zipBuf = zip.toBuffer();
         const dateStr = new Date().toISOString().slice(0, 10);
         res.setHeader('Content-Type', 'application/zip');
         res.setHeader('Content-Disposition', `attachment; filename="badatel-backup-${dateStr}.zip"`);
-        res.setHeader('Content-Length', stat.size);
+        res.setHeader('Content-Length', zipBuf.length);
         res.statusCode = 200;
-
-        if (typeof res.write === 'function' && typeof res.on === 'function') {
-          const stream = fs.createReadStream(tempExportPath);
-          stream.pipe(res);
-          stream.on('close', () => {
-            try { fs.unlinkSync(tempExportPath); } catch {}
-          });
-        } else {
-          const fileBuf = fs.readFileSync(tempExportPath);
-          try { fs.unlinkSync(tempExportPath); } catch {}
-          res.end(fileBuf);
-        }
-        return;
+        return res.end(zipBuf);
       }
 
       // 9. POST /api/import/inspect
@@ -1222,7 +1219,7 @@ export function createApiMiddleware() {
           const { base64, token } = body;
           if (token) {
             const safeToken = path.basename(token).replace(/[^a-zA-Z0-9._-]/g, '');
-            zipPath = path.join(TEMP_DIR, safeToken);
+            zipPath = path.join(getTempDir(), safeToken);
             tempToken = safeToken;
             if (!fs.existsSync(zipPath)) {
               res.statusCode = 400;
@@ -1231,7 +1228,7 @@ export function createApiMiddleware() {
           } else if (base64 && typeof base64 === 'string') {
             const base64Data = base64.replace(/^data:[^;]+;base64,/, '');
             tempToken = `import_${Date.now()}_${Math.random().toString(36).slice(2)}.zip`;
-            zipPath = path.join(TEMP_DIR, tempToken);
+            zipPath = path.join(getTempDir(), tempToken);
             fs.writeFileSync(zipPath, Buffer.from(base64Data, 'base64'));
           } else {
             res.statusCode = 400;
@@ -1311,7 +1308,7 @@ export function createApiMiddleware() {
           mode = body.mode || 'replace';
           if (body.token) {
             const safeToken = path.basename(body.token).replace(/[^a-zA-Z0-9._-]/g, '');
-            zipPath = path.join(TEMP_DIR, safeToken);
+            zipPath = path.join(getTempDir(), safeToken);
             if (!fs.existsSync(zipPath)) {
               res.statusCode = 400;
               return res.end(JSON.stringify({ error: 'Import session expired or archive file not found. Please re-select your file.' }));
@@ -1319,7 +1316,7 @@ export function createApiMiddleware() {
           } else if (body.base64 && typeof body.base64 === 'string') {
             const base64Data = body.base64.replace(/^data:[^;]+;base64,/, '');
             const tempName = `import_${Date.now()}_${Math.random().toString(36).slice(2)}.zip`;
-            zipPath = path.join(TEMP_DIR, tempName);
+            zipPath = path.join(getTempDir(), tempName);
             fs.writeFileSync(zipPath, Buffer.from(base64Data, 'base64'));
           } else {
             res.statusCode = 400;
@@ -1375,7 +1372,7 @@ export function createApiMiddleware() {
         // If replacing all data, take a safety backup first
         if (mode === 'replace') {
           try {
-            const backupFile = path.join(BACKUP_DIR, `pre_replace_backup_${Date.now()}.json`);
+            const backupFile = path.join(getBackupDir(), `pre_replace_backup_${Date.now()}.json`);
             const snapshot = {
               timestamp: new Date().toISOString(),
               settings: readSettings(),
@@ -1393,7 +1390,7 @@ export function createApiMiddleware() {
         for (const entry of entries) {
           if (!entry.isDirectory && entry.entryName.startsWith('media/')) {
             const safeName = path.basename(entry.entryName).replace(/[^a-zA-Z0-9._-]/g, '_');
-            const targetPath = path.join(UPLOADS_DIR, safeName);
+            const targetPath = path.join(getUploadsDir(), safeName);
             fs.writeFileSync(targetPath, entry.getData());
           }
         }
