@@ -494,23 +494,24 @@ export const MapViewer: React.FC<MapViewerProps> = ({
       <div ref={mapContainerRef} className="w-full h-full" />
 
       {/* Floating Controls at TOP RIGHT */}
-      <div className="absolute top-5 right-6 z-[500] flex flex-col items-end space-y-2.5 max-w-[90vw]">
+      <div className="absolute top-3 right-3 sm:top-5 sm:right-6 z-[500] flex flex-col items-end space-y-2 max-w-[95vw] sm:max-w-[90vw]">
         {/* View Mode Status Indicator (Fades out after 4s) */}
         {mode === 'view' && (
           <div className={`transition-opacity duration-1000 ${showGuide ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-            <div className="px-4 py-2 rounded-2xl bg-slate-900 border-2 border-slate-700 shadow-2xl flex items-center space-x-2 text-xs font-bold text-slate-200">
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>VIEW MODE: Click any building letter to inspect documents</span>
+            <div className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl bg-slate-900/95 border-2 border-slate-700 shadow-2xl flex items-center space-x-2 text-[11px] sm:text-xs font-bold text-slate-200 backdrop-blur-sm">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span className="hidden sm:inline">VIEW MODE: Click any building letter to inspect documents</span>
+              <span className="inline sm:hidden">VIEW: Tap building letter for docs</span>
             </div>
           </div>
         )}
 
         {/* Edit Mode Sub-Tools Bar */}
         {mode === 'edit' && (
-          <div className="flex flex-col items-end space-y-2">
-            <div className="flex items-center bg-slate-900 border-2 border-amber-500/80 p-1.5 rounded-2xl shadow-2xl space-x-1.5">
-              <div className="px-3 py-1 text-xs font-black uppercase tracking-wider text-amber-400 flex items-center border-r border-slate-700 mr-1">
-                Edit Mode:
+          <div className="flex flex-col items-end space-y-1.5 sm:space-y-2">
+            <div className="flex items-center bg-slate-900/95 border-2 border-amber-500/80 p-1 sm:p-1.5 rounded-2xl shadow-2xl space-x-1 sm:space-x-1.5 backdrop-blur-sm">
+              <div className="hidden sm:flex px-3 py-1 text-xs font-black uppercase tracking-wider text-amber-400 items-center border-r border-slate-700 mr-1">
+                Edit:
               </div>
 
               <button
@@ -518,15 +519,16 @@ export const MapViewer: React.FC<MapViewerProps> = ({
                   if (isDrawing) toggleDrawMode();
                   setEditTool('drag');
                 }}
-                className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                className={`flex items-center space-x-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition ${
                   editTool === 'drag' && !isDrawing
                     ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/40'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800'
                 }`}
                 title="Click and drag inside any building polygon to move the whole region"
               >
-                <Move className="w-4 h-4" />
-                <span>Move Region</span>
+                <Move className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Move Region</span>
+                <span className="inline sm:hidden">Move</span>
               </button>
 
               <button
@@ -534,57 +536,59 @@ export const MapViewer: React.FC<MapViewerProps> = ({
                   if (isDrawing) toggleDrawMode();
                   setEditTool('reshape');
                 }}
-                className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                className={`flex items-center space-x-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition ${
                   editTool === 'reshape' && !isDrawing
                     ? 'bg-amber-600 text-white shadow-md ring-2 ring-amber-400/40'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800'
                 }`}
                 title="Drag corner handles to reshape building footprint"
               >
-                <Scissors className="w-4 h-4" />
-                <span>Reshape Corners</span>
+                <Scissors className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Reshape Corners</span>
+                <span className="inline sm:hidden">Reshape</span>
               </button>
 
               <button
                 onClick={toggleDrawMode}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
+                className={`flex items-center space-x-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition ${
                   isDrawing
                     ? 'bg-red-600 text-white animate-pulse'
                     : 'bg-blue-600 hover:bg-blue-500 text-white shadow-md'
                 }`}
                 title="Draw a brand new building footprint"
               >
-                <PenTool className="w-4 h-4" />
-                <span>{isDrawing ? 'Cancel Drawing' : '+ Draw Footprint'}</span>
+                <PenTool className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">{isDrawing ? 'Cancel Drawing' : '+ Draw Footprint'}</span>
+                <span className="inline sm:hidden">{isDrawing ? 'Cancel' : '+ Draw'}</span>
               </button>
             </div>
 
             {/* Helper tooltip under the edit tools (Fades out after 4s) */}
             <div className={`transition-opacity duration-1000 ${showGuide || isDrawing ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-              <div className="bg-slate-900/95 border border-slate-700 text-slate-300 text-[11px] px-3.5 py-1.5 rounded-xl shadow-xl">
-                {editTool === 'drag' && !isDrawing && '✋ Click & drag inside any building to move region. Drag badge to offset letter.'}
-                {editTool === 'reshape' && !isDrawing && '📐 Drag any white corner handle to adjust polygon shape.'}
-                {isDrawing && '✏️ Click on corners of building. Click first point to finish.'}
+              <div className="bg-slate-900/95 border border-slate-700 text-slate-300 text-[10px] sm:text-[11px] px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl shadow-xl max-w-xs text-right sm:text-left">
+                {editTool === 'drag' && !isDrawing && '✋ Drag inside building to move region.'}
+                {editTool === 'reshape' && !isDrawing && '📐 Drag corner handles to reshape.'}
+                {isDrawing && '✏️ Tap corners of building. Tap first point to finish.'}
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Sheets Menu (Moved to BOTTOM LEFT) */}
-      <div className="absolute bottom-6 left-6 z-[500] bg-slate-900 border-2 border-slate-700 px-4 py-2 rounded-2xl shadow-2xl flex items-center space-x-2.5 max-w-[45vw] overflow-hidden">
-        <span className="text-xs font-bold text-slate-300 uppercase flex items-center shrink-0">
-          <Layers className="w-3.5 h-3.5 mr-1.5 text-blue-400" />
-          Sheets:
+      {/* Sheets Menu (BOTTOM LEFT, elevated above Safari bottom search bar) */}
+      <div className="absolute bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] left-3 sm:left-6 z-[500] bg-slate-900/95 border-2 border-slate-700 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl shadow-2xl flex items-center space-x-2 sm:space-x-2.5 max-w-[calc(100vw-5rem)] sm:max-w-[50vw] overflow-hidden backdrop-blur-sm">
+        <span className="text-[11px] sm:text-xs font-bold text-slate-300 uppercase flex items-center shrink-0">
+          <Layers className="w-3.5 h-3.5 mr-1 text-blue-400" />
+          <span className="hidden sm:inline">Sheets:</span>
         </span>
-        <div className="flex items-center space-x-2 overflow-x-auto py-0.5">
+        <div className="flex items-center space-x-1.5 sm:space-x-2 overflow-x-auto py-0.5">
           {maps.map((mapPage, idx) => {
             const isActive = mapPage.id === currentMap.id;
             return (
               <button
                 key={mapPage.id}
                 onClick={() => onSwitchPage(mapPage.id)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shrink-0 ${
+                className={`px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shrink-0 ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-400/40'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800 bg-slate-950 border border-slate-800'
@@ -598,7 +602,7 @@ export const MapViewer: React.FC<MapViewerProps> = ({
           {onOpenSettings && (
             <button
               onClick={onOpenSettings}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-blue-400 hover:bg-slate-800 bg-slate-950 border border-slate-800 transition shrink-0"
+              className="p-1 sm:p-1.5 rounded-xl text-slate-400 hover:text-blue-400 hover:bg-slate-800 bg-slate-950 border border-slate-800 transition shrink-0"
               title="Add another site map sheet"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -607,12 +611,12 @@ export const MapViewer: React.FC<MapViewerProps> = ({
         </div>
       </div>
 
-      {/* Floating Map Controls (Bottom Right): Zoom In (+), Fit Full Plan (100%), Zoom Out (-), Rotate */}
-      <div className="absolute bottom-6 right-6 z-[500] flex flex-col space-y-1.5 bg-slate-900 border-2 border-slate-700 p-1.5 rounded-2xl shadow-2xl">
+      {/* Floating Map Controls (BOTTOM RIGHT, elevated above Safari bottom search bar) */}
+      <div className="absolute bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] right-3 sm:right-6 z-[500] flex flex-col space-y-1 sm:space-y-1.5 bg-slate-900/95 border-2 border-slate-700 p-1 sm:p-1.5 rounded-2xl shadow-2xl backdrop-blur-sm">
         {/* Zoom In Button */}
         <button
           onClick={handleZoomIn}
-          className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white transition flex items-center justify-center"
+          className="p-2 sm:p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white transition flex items-center justify-center"
           title="Zoom In (+)"
         >
           <ZoomIn className="w-4 h-4" />
@@ -621,7 +625,7 @@ export const MapViewer: React.FC<MapViewerProps> = ({
         {/* 100% Fit Full Site Plan Button */}
         <button
           onClick={handleFitFullSitePlan}
-          className="px-2 py-1.5 rounded-xl bg-slate-800 hover:bg-blue-600 text-slate-200 hover:text-white transition flex items-center justify-center font-mono text-[11px] font-extrabold tracking-tight"
+          className="px-1.5 sm:px-2 py-1 sm:py-1.5 rounded-xl bg-slate-800 hover:bg-blue-600 text-slate-200 hover:text-white transition flex items-center justify-center font-mono text-[10px] sm:text-[11px] font-extrabold tracking-tight"
           title="Fit full site plan (100%)"
         >
           100%
@@ -630,7 +634,7 @@ export const MapViewer: React.FC<MapViewerProps> = ({
         {/* Zoom Out Button */}
         <button
           onClick={handleZoomOut}
-          className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white transition flex items-center justify-center"
+          className="p-2 sm:p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white transition flex items-center justify-center"
           title="Zoom Out (-)"
         >
           <ZoomOut className="w-4 h-4" />
@@ -642,7 +646,7 @@ export const MapViewer: React.FC<MapViewerProps> = ({
         {onRotateMap && (
           <button
             onClick={onRotateMap}
-            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-400 hover:text-blue-300 transition flex items-center justify-center"
+            className="p-2 sm:p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-400 hover:text-blue-300 transition flex items-center justify-center"
             title="Rotate Current Sheet 90° Clockwise"
           >
             <RotateCw className="w-4 h-4" />

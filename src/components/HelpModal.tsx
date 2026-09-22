@@ -54,18 +54,18 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
     : '';
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/90 animate-in fade-in duration-150">
-      <div className="bg-slate-900 border-2 border-slate-600 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden text-slate-100">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-2 sm:p-4 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] bg-black/90 animate-in fade-in duration-150">
+      <div className="bg-slate-900 border-2 border-slate-600 rounded-2xl w-full max-w-xl max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden text-slate-100">
         {/* Header */}
-        <div className="px-6 py-4 border-b-2 border-slate-800 flex items-center justify-between bg-slate-950">
-          <div className="flex items-center space-x-2.5">
-            <h2 className="text-lg font-bold text-white flex items-center space-x-2">
-              <span>📖 How to Use Your Interactive Site Plan</span>
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b-2 border-slate-800 flex items-center justify-between bg-slate-950">
+          <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+            <h2 className="text-base sm:text-lg font-bold text-white truncate">
+              📖 How to Use Your Interactive Site Plan
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition"
+            className="p-1.5 sm:p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition shrink-0"
             title="Close (Esc)"
           >
             <X className="w-5 h-5" />
@@ -73,7 +73,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-5 text-sm text-slate-200 max-h-[75vh] overflow-y-auto leading-relaxed bg-slate-900">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 text-sm text-slate-200 flex-1 overflow-y-auto leading-relaxed bg-slate-900">
           {/* Step 1 */}
           <div className="flex items-start space-x-3.5">
             <div className="w-8 h-8 rounded-xl bg-blue-600/30 border border-blue-500/50 text-blue-300 flex items-center justify-center font-bold text-sm shrink-0">
@@ -200,7 +200,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t-2 border-slate-800 bg-slate-950 flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-t-2 border-slate-800 bg-slate-950 flex items-center justify-between">
           <div className="text-[11px] text-slate-500 font-mono flex items-center space-x-2">
             <span>Badatel v{versionInfo.version}</span>
             <span>•</span>

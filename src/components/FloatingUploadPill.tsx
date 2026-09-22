@@ -53,7 +53,7 @@ export const FloatingUploadPill: React.FC = () => {
     : (completedCount === 1 ? '1 file uploaded' : 'Uploads completed');
 
   return (
-    <div className="fixed bottom-6 right-6 z-[1150] select-none animate-in fade-in slide-in-from-bottom-3 duration-200">
+    <div className="fixed top-[calc(4.5rem+env(safe-area-inset-top,0px))] left-3 right-3 sm:top-auto sm:left-auto sm:bottom-28 sm:right-6 z-[1150] select-none animate-in fade-in slide-in-from-top-2 sm:slide-in-from-bottom-3 duration-200">
       <div
         onClick={openMenu}
         className={`group flex items-center space-x-3.5 px-4 py-2.5 rounded-2xl border-2 shadow-2xl backdrop-blur-md cursor-pointer transition transform hover:scale-[1.02] ${

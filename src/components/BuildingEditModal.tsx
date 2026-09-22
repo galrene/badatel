@@ -3,7 +3,7 @@ import { Building, DocumentItem, LocalFileItem } from '../types';
 import { fetchLocalFiles, rotateImage } from '../api';
 import { useUploadQueue } from '../context/UploadContext';
 import { 
-  X, Trash2, Upload, Check, AlertTriangle, 
+  X, Trash2, Upload, Check, 
   Image as ImageIcon, FolderOpen, RotateCw,
   FolderPlus, Search, CheckSquare, Square, Plus, Loader2
 } from 'lucide-react';
@@ -254,26 +254,26 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/90 animate-in fade-in duration-150">
-      <div className="bg-slate-900 border-2 border-slate-600 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-slate-100">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-2 sm:p-4 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] bg-black/90 animate-in fade-in duration-150">
+      <div className="bg-slate-900 border-2 border-slate-600 rounded-2xl w-full max-w-2xl max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden text-slate-100">
         
         {/* Header */}
-        <div className="px-6 py-4 border-b-2 border-slate-800 flex items-center justify-between bg-slate-950">
-          <div className="flex items-center space-x-3">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b-2 border-slate-800 flex items-center justify-between bg-slate-950">
+          <div className="flex items-center space-x-3 min-w-0 pr-2">
             <div 
-              className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xl text-white shadow-md border-2 border-white/40"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-bold text-lg sm:text-xl text-white shadow-md border-2 border-white/40 shrink-0"
               style={{ backgroundColor: formData.color }}
             >
               {formData.letter}
             </div>
-            <div>
-              <h2 className="text-lg font-bold text-white">Edit Building [{formData.letter}]</h2>
-              <p className="text-xs text-slate-400">Configure building details and photographed documents</p>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-bold text-white truncate">Edit Building [{formData.letter}]</h2>
+              <p className="text-[11px] sm:text-xs text-slate-400 truncate">Configure building details and documents</p>
             </div>
           </div>
           <button 
             onClick={onClose}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition"
+            className="p-1.5 sm:p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition shrink-0"
             title="Close (Esc)"
           >
             <X className="w-5 h-5" />
@@ -281,7 +281,7 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-900">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 bg-slate-900">
           {/* Basic Info */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
@@ -675,35 +675,34 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t-2 border-slate-800 bg-slate-950 flex items-center justify-between">
+        {/* Footer Actions */}
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-t-2 border-slate-800 bg-slate-950 flex items-center justify-between flex-wrap gap-2">
           <div>
             {!confirmDelete ? (
               <button
                 type="button"
                 onClick={() => setConfirmDelete(true)}
-                className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-red-400 hover:bg-red-500/10 text-xs font-semibold transition"
+                className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 hover:text-rose-100 border border-rose-800/60 text-xs font-semibold transition"
               >
                 <Trash2 className="w-4 h-4" />
-                <span>Delete Building</span>
+                <span className="hidden sm:inline">Delete Building</span>
+                <span className="inline sm:hidden">Delete</span>
               </button>
             ) : (
-              <div className="flex items-center space-x-2">
-                <span className="text-xs text-red-400 font-bold flex items-center">
-                  <AlertTriangle className="w-3.5 h-3.5 mr-1" />
-                  Confirm delete?
-                </span>
+              <div className="flex items-center space-x-2 bg-rose-950/80 border border-rose-600 p-1.5 rounded-xl">
+                <span className="text-xs text-rose-200 font-bold px-1">Delete?</span>
                 <button
                   type="button"
                   onClick={() => onDelete(formData.id)}
-                  className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition shadow"
+                  className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow"
                 >
-                  Yes, Delete
+                  <span className="hidden sm:inline">Yes, Delete</span>
+                  <span className="inline sm:hidden">Yes</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmDelete(false)}
-                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition"
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition"
                 >
                   Cancel
                 </button>
@@ -711,18 +710,18 @@ export const BuildingEditModal: React.FC<BuildingEditModalProps> = ({
             )}
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3 ml-auto">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
+              className="px-3.5 sm:px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="flex items-center space-x-1.5 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-lg transition"
+              className="flex items-center space-x-1.5 px-4 sm:px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-lg transition"
             >
               <Check className="w-4 h-4" />
               <span>Save Changes</span>

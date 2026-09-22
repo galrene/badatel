@@ -1,9 +1,9 @@
 {
   "version": "0.1.0",
-  "commitHash": "930adb76919788fd44ad267090d19abd1329adc8",
-  "shortHash": "930adb7",
-  "commitMessage": "Merge branch 'global_upload_status_menu'",
-  "commitDate": "2026-09-18 21:48:29 +0200",
-  "branch": "deduplicate_uploaded_data",
-  "buildTime": "2026-09-18T22:29:50.733Z"
+  "commitHash": "d87ed4dc93aa1157984958588eef8950fe7b1750",
+  "shortHash": "d87ed4d",
+  "commitMessage": "repo: update readme warning",
+  "commitDate": "2026-09-19 09:22:38 +0200",
+  "branch": "fix_iphone_safari_rendering",
+  "buildTime": "2026-09-22T14:50:55.911Z"
 }

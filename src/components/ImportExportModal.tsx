@@ -147,22 +147,22 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/90 animate-in fade-in duration-150">
-      <div className="bg-slate-900 border-2 border-slate-600 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-slate-100">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-2 sm:p-4 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] bg-black/90 animate-in fade-in duration-150">
+      <div className="bg-slate-900 border-2 border-slate-600 rounded-2xl w-full max-w-2xl max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden text-slate-100">
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b-2 border-slate-800 flex items-center justify-between bg-slate-950">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-500/40 text-blue-400 flex items-center justify-center">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b-2 border-slate-800 flex items-center justify-between bg-slate-950">
+          <div className="flex items-center space-x-3 min-w-0 pr-2">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-600/30 border border-blue-500/40 text-blue-400 flex items-center justify-center shrink-0">
               <FileArchive className="w-5 h-5" />
             </div>
-            <div>
-              <h2 className="text-lg font-bold text-white">Project Data & Backup</h2>
-              <p className="text-xs text-slate-400">Export or restore all map pages, footprints, and documents</p>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-bold text-white truncate">Project Data & Backup</h2>
+              <p className="text-[11px] sm:text-xs text-slate-400 truncate">Export or restore map pages, footprints, and documents</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition"
+            className="p-1.5 sm:p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition shrink-0"
             title="Close (Esc)"
           >
             <X className="w-5 h-5" />
@@ -195,8 +195,8 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-6 space-y-6 bg-slate-900 flex-1 overflow-y-auto">
+        {/* Modal Content */}
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 bg-slate-900 flex-1 overflow-y-auto">
           {activeTab === 'export' ? (
             <div className="space-y-6">
               {/* Current Project Snapshot Card */}

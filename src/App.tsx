@@ -227,7 +227,7 @@ export const App: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="h-screen w-screen bg-slate-950 flex flex-col items-center justify-center text-slate-300">
+      <div className="h-full h-dvh w-screen max-w-full bg-slate-950 flex flex-col items-center justify-center text-slate-300">
         <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
         <p className="text-sm font-bold">Loading Site Plan & Documentation...</p>
       </div>
@@ -236,7 +236,7 @@ export const App: React.FC = () => {
 
   if (error || !settings || !currentMap) {
     return (
-      <div className="h-screen w-screen bg-slate-950 flex flex-col items-center justify-center text-red-400 p-6 text-center">
+      <div className="h-full h-dvh w-screen max-w-full bg-slate-950 flex flex-col items-center justify-center text-red-400 p-6 text-center">
         <p className="text-lg font-bold">Error loading map</p>
         <p className="text-sm text-slate-400 mt-2">{error || 'Settings not loaded'}</p>
         <button
@@ -254,7 +254,7 @@ export const App: React.FC = () => {
 
   return (
     <UploadProvider onDocumentCompleted={handleDocumentCompleted} isDocumentAttached={isDocumentAttached}>
-      <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950">
+      <div className="flex flex-col h-full h-dvh w-screen max-w-full overflow-hidden bg-slate-950">
         {/* Top Header */}
         <Header
           settings={settings}
